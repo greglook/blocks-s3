@@ -5,6 +5,8 @@
     [clojure.string :as str]
     [multihash.core :as multihash])
   (:import
+    (com.amazonaws.auth
+      BasicAWSCredentials)
     (com.amazonaws.regions
       Region
       Regions)
@@ -111,17 +113,31 @@
 
 
 (defn s3-store
-  "Creates a new in-memory block store."
+  "Creates a new S3 block store. If credentials are not explicitly provided, the
+  AWS SDK will use a number of mechanisms to infer them from the environment.
+
+  Supported options:
+
+  - `:credentials` a map with `:access-key` and `:secret-key` entries providing
+    explicit AWS credentials.
+  - `:region` a keyword or string designating the region the bucket is in.
+  - `:prefix` a string prefix to store the blocks under."
   [bucket & {:as opts}]
   (when (or (not (string? bucket))
-            (empty? bucket))
+            (empty? (str/trim bucket)))
     (throw (IllegalArgumentException.
              (str "Bucket name must be a non-empty string, got: "
                   (pr-str bucket)))))
-  (let [us-west-2 (Region/getRegion Regions/US_WEST_2)
-        client (doto (AmazonS3Client.)
-                 (.setRegion us-west-2))]
-    (S3BlockStore. client bucket (:prefix opts))))
+  (let [client (if-let [creds (:credentials opts)]
+                 (AmazonS3Client. (BasicAWSCredentials.
+                                    (:access-key creds)
+                                    (:secret-key creds)))
+                 (AmazonS3Client.))]
+    (when-let [region (get-region (:region opts))]
+      (.setRegion client region))
+    (S3BlockStore. client
+                   (str/trim bucket)
+                   (trim-slashes (:prefix opts)))))
 
 
 ;; Remove automatic constructor functions.
