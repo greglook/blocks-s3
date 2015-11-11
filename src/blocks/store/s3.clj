@@ -24,40 +24,104 @@
       S3ObjectSummary)))
 
 
+;; ## S3 Utilities
+
+(defn s3-uri
+  "Constructs a URI referencing an object in S3."
+  [bucket object-key]
+  (java.net.URI. "s3" bucket (str "/" object-key) nil))
+
+
+(defn get-region
+  "Translates a Clojure keyword into an S3 region instance. Throws an exception
+  if the keyword doesn't match a supported region."
+  [region]
+  (some->
+    (if (string? region) (keyword region) region)
+    (case
+      :us-west-1 Regions/US_WEST_1
+      :us-west-2 Regions/US_WEST_2
+      (throw (IllegalArgumentException.
+               (str "No supported region matching " (pr-str region)))))
+    (Region/getRegion)))
+
+
+
+;; ## S3 Key Translation
+
+(defn- trim-slashes
+  "Cleans a string by removing leading and trailing slashes, then leading and
+  trailing whitespace. Returns nil if the resulting string is empty."
+  ^String
+  [string]
+  (when-not (empty? string)
+    (let [result (-> string
+                     (str/replace #"^/*([^/].*[^/])/*$" "$1")
+                     (str/trim))]
+      (when-not (empty? result)
+        result))))
+
+
+(defn- get-subkey
+  "Checks an object key against a common prefix. If provided, the prefix is
+  checked against the key to ensure it actually matches the beginning of the
+  key. If prefix is nil, or trims down to an empty string, the key is returned
+  unchanged."
+  [prefix ^String object-key]
+  (if-let [prefix' (trim-slashes prefix)]
+    (do
+      (when-not (.startsWith object-key (str prefix' "/"))
+        (throw (IllegalStateException.
+                 (str "S3 object " object-key
+                      " is not under prefix " prefix'))))
+      (subs object-key (count prefix')))
+    object-key))
+
+
 (defn- id->key
+  "Converts a multihash identifier to an S3 object key, potentially applying a
+  common prefix. Multihashes are rendered as hex strings."
   [prefix id]
-  (str prefix "/" (multihash/hex id)))
+  (let [block-subkey (multihash/hex id)]
+    (if-let [prefix' (trim-slashes prefix)]
+      (str prefix' "/" block-subkey)
+      block-subkey)))
 
 
 (defn- key->id
-  [prefix ^String object-key]
-  (when-not (.startsWith object-key prefix)
-    (throw (IllegalStateException.
-             (str "S3 object " object-key " is not under prefix " prefix))))
-  (-> object-key
-      (subs (inc (count prefix)))
-      (multihash/decode)))
+  "Converts an S3 object key into a multihash identifier, potentially stripping
+  out a common prefix. The block subkey must be a valid hex-encoded multihash."
+  [prefix object-key]
+  (let [block-subkey (get-subkey prefix object-key)]
+    (when (empty? block-subkey)
+      (throw (IllegalStateException.
+               (str "Cannot parse id from empty block subkey: " object-key))))
+    (when-not (re-matches #"^[0-9a-f]+$" block-subkey)
+      (throw (IllegalStateException.
+               (str "Block subkey " block-subkey " is not valid hexadecimal"))))
+    (multihash/decode block-subkey)))
 
+
+
+;; ## S3 Block Functions
 
 (defn- summary-stats
   "Generates a metadata map from an S3ObjectSummary."
   [prefix ^S3ObjectSummary object]
   {:id (key->id prefix (.getKey object))
    :size (.getSize object)
-   :source (format "s3://%s/%s" (.getBucketName object) (.getKey object))
+   :source (s3-uri (.getBucketName object) (.getKey object))
    :stored-at (.getLastModified object)})
 
 
 (defn- metadata-stats
   "Generates a metadata map from an ObjectMetadata."
-  [bucket object-key id ^ObjectMetadata metadata]
-  {:id id
-   :size (.getContentLength metadata)
-   :source (format "s3://%s/%s" bucket object-key)
+  [bucket object-key ^ObjectMetadata metadata]
+  {:source (s3-uri bucket object-key)
    :stored-at (.getLastModified metadata)})
 
 
-;; Block records in a memory store are held in a map in an atom.
+;; Block records are stored in a bucket in S3, under some key prefix.
 (defrecord S3BlockStore
   [^AmazonS3 client
    ^String bucket
@@ -69,7 +133,8 @@
     [this id]
     (let [object-key (id->key prefix id)
           response (.getObjectMetadata client bucket object-key)]
-      (metadata-stats bucket object-key id response)))
+      (merge (metadata-stats bucket object-key response)
+             {:id id, :size (.getContentLength response)})))
 
 
   (-list
@@ -80,19 +145,20 @@
                     (.setMarker (:after opts))
                     (.setMaxKeys (:limit opts)))
           response (.listObjects client request)]
-      ; TODO: check if isTruncated is true, make lazy seq
+      ; TODO: check if isTruncated is true, make lazy seq which respects :limit
       (map (partial summary-stats prefix) (.getObjectSummaries response))))
 
 
   (-get
     [this id]
     (let [object-key (id->key prefix id)
-          s3-object (.getObject client bucket object-key)
-          metadata (metadata-stats bucket object-key id (.getObjectMetadata s3-object))]
-      ; TODO: lazy blocks, not literals
+          object (.getObject client bucket object-key)]
+      ; TODO: check metadata to see if block already exists
+      ; TODO: return lazy blocks, not literals
       (block/with-stats
-        (block/read! (.getObjectContent s3-object))
-        metadata)))
+        (with-open [content (.getObjectContent object)]
+          (block/read! content))
+        (metadata-stats bucket object-key (.getObjectMetadata object)))))
 
 
   (put!
@@ -103,8 +169,10 @@
           object-key (id->key prefix (:id block))
           result (with-open [content (block/open block)]
                    (.putObject client bucket object-key content metadata))]
-      ; TODO: return new lazy block, not just metadata
-      (metadata-stats bucket object-key (:id block) (.getMetadata result))))
+      ; TODO: return new lazy block, not literal
+      (block/with-stats
+        (block/load! block)
+        (metadata-stats bucket object-key (.getMetadata result)))))
 
 
   (delete!
