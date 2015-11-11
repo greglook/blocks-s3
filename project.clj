@@ -7,7 +7,8 @@
   :deploy-branches ["master"]
 
   :dependencies
-  [[mvxcvi/multihash "1.1.0"]
+  [[mvxcvi/blocks "0.4.0"]
+   [mvxcvi/multihash "1.1.0"]
    [org.clojure/clojure "1.7.0"]]
 
   :whidbey
