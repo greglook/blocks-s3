@@ -7,10 +7,15 @@
   :deploy-branches ["master"]
 
   :dependencies
-  [[mvxcvi/blocks "0.4.0"]
+  [[com.amazonaws/aws-java-sdk "1.10.32"]
+   [mvxcvi/blocks "0.4.0"]
    [mvxcvi/multihash "1.1.0"]
    [org.clojure/clojure "1.7.0"]]
 
   :whidbey
   {:tag-types {'multihash.core.Multihash {'data/hash 'multihash.core/base58}
-               'blocks.data.Block {'blocks.data.Block (partial into {})}}})
+               'blocks.data.Block {'blocks.data.Block (partial into {})}}}
+
+  :profiles
+  {:repl {:source-paths ["dev"]
+          :dependencies [[org.clojure/tools.namespace "0.2.10"]]}})
