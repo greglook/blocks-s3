@@ -14,6 +14,7 @@
       AmazonS3
       AmazonS3Client)
     (com.amazonaws.services.s3.model
+      AmazonS3Exception
       Bucket
       GetObjectRequest
       ListObjectsRequest
@@ -116,8 +117,10 @@
 
 (defn- metadata-stats
   "Generates a metadata map from an ObjectMetadata."
-  [bucket object-key ^ObjectMetadata metadata]
-  {:source (s3-uri bucket object-key)
+  [id bucket object-key ^ObjectMetadata metadata]
+  {:id id
+   :size (.getContentLength metadata)
+   :source (s3-uri bucket object-key)
    :stored-at (.getLastModified metadata)})
 
 
@@ -131,10 +134,14 @@
 
   (stat
     [this id]
-    (let [object-key (id->key prefix id)
-          response (.getObjectMetadata client bucket object-key)]
-      (merge (metadata-stats bucket object-key response)
-             {:id id, :size (.getContentLength response)})))
+    (let [object-key (id->key prefix id)]
+      (try
+        (let [response (.getObjectMetadata client bucket object-key)]
+          (metadata-stats id bucket object-key response))
+        (catch AmazonS3Exception ex
+          ; Check for not-found errors and return nil.
+          (when (not= 404 (.getStatusCode ex))
+            (throw ex))))))
 
 
   (-list
