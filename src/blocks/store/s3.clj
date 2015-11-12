@@ -95,9 +95,11 @@
   out a common prefix. The block subkey must be a valid hex-encoded multihash."
   [prefix object-key]
   (let [block-subkey (get-subkey prefix object-key)]
+    ; TODO: this should log a warning and return nil
     (when (empty? block-subkey)
       (throw (IllegalStateException.
                (str "Cannot parse id from empty block subkey: " object-key))))
+    ; TODO: this should log a warning and return nil
     (when-not (re-matches #"^[0-9a-f]+$" block-subkey)
       (throw (IllegalStateException.
                (str "Block subkey " block-subkey " is not valid hexadecimal"))))
@@ -184,9 +186,10 @@
         ; Block already exists, return lazy block.
         (object->block client bucket prefix stats)
         ; Otherwise, upload block to S3.
-        (let [metadata (doto (ObjectMetadata.)
+        (let [object-key (id->key prefix (:id block))
+              ; TODO: Idea - allow expiry argument or function which allows you to mutate the ObjectMetadata before it is sent in the putObject call.
+              metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))
-              object-key (id->key prefix (:id block))
               result (with-open [content (block/open block)]
                        (.putObject client bucket object-key content metadata))
               stats (metadata-stats (:id block) bucket object-key (.getMetadata result))]
