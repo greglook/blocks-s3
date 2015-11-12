@@ -201,7 +201,10 @@
 
   (delete!
     [this id]
-    (throw (UnsupportedOperationException. "Not Yet Implemented"))))
+    (when (.stat this id)
+      (let [object-key (id->key prefix id)]
+        (.deleteObject client bucket object-key))
+      true)))
 
 
 (defn s3-store
