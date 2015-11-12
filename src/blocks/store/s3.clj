@@ -2,6 +2,7 @@
   "Block storage backed by a bucket in Amazon S3."
   (:require
     [blocks.core :as block]
+    [blocks.data :as data]
     [clojure.string :as str]
     [multihash.core :as multihash])
   (:import
@@ -124,6 +125,18 @@
    :stored-at (.getLastModified metadata)})
 
 
+(defn- object->block
+  "Creates a lazy block to read from the given S3 object."
+  [client bucket prefix stats]
+  (block/with-stats
+    (data/lazy-block
+      (:id stats) (:size stats)
+      (let [object-key (id->key prefix (:id stats))]
+        (fn object-reader []
+          (.getObjectContent (.getObject client bucket object-key)))))
+    (dissoc stats :id :size)))
+
+
 ;; Block records are stored in a bucket in S3, under some key prefix.
 (defrecord S3BlockStore
   [^AmazonS3 client
@@ -158,28 +171,25 @@
 
   (-get
     [this id]
-    (let [object-key (id->key prefix id)
-          object (.getObject client bucket object-key)]
-      ; TODO: check metadata to see if block already exists
-      ; TODO: return lazy blocks, not literals
-      (block/with-stats
-        (with-open [content (.getObjectContent object)]
-          (block/read! content))
-        (metadata-stats bucket object-key (.getObjectMetadata object)))))
+    (when-let [stats (.stat this id)]
+      (object->block client bucket prefix stats)))
 
 
   (put!
     [this block]
-    ; TODO: check if block already exists, if so return updated lazy block
-    (let [metadata (doto (ObjectMetadata.)
-                     (.setContentLength (:size block)))
-          object-key (id->key prefix (:id block))
-          result (with-open [content (block/open block)]
-                   (.putObject client bucket object-key content metadata))]
-      ; TODO: return new lazy block, not literal
-      (block/with-stats
-        (block/load! block)
-        (metadata-stats bucket object-key (.getMetadata result)))))
+    (data/merge-blocks
+      block
+      (if-let [stats (.stat this (:id block))]
+        ; Block already exists, return lazy block.
+        (object->block client bucket prefix stats)
+        ; Otherwise, upload block to S3.
+        (let [metadata (doto (ObjectMetadata.)
+                         (.setContentLength (:size block)))
+              object-key (id->key prefix (:id block))
+              result (with-open [content (block/open block)]
+                       (.putObject client bucket object-key content metadata))
+              stats (metadata-stats (:id block) bucket object-key (.getMetadata result))]
+          (object->block client bucket prefix stats)))))
 
 
   (delete!
