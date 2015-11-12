@@ -15,5 +15,5 @@
     multihash.core.Multihash))
 
 
-(def cloud
-  (s3-store "greglook-data" :prefix "blocks-test/"))
+(def cloud (s3-store "greglook-data" :prefix "blocks-test-2"))
+(def s3 (:client cloud))
