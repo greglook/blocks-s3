@@ -193,6 +193,17 @@
       true)))
 
 
+(defn erase!
+  "Clears all blocks from the S3 store by deleting everything in the bucket
+  matching the store prefix."
+  [store]
+  (let [^AmazonS3 client (:client store)
+        object-listing (.listObjects client (:bucket store) (:prefix store))]
+    (doseq [object (.getObjectSummaries object-listing)]
+      (.deleteObject client (:bucket store) (.getKey object)))
+    nil))
+
+
 
 ;; ## Store Construction
 
