@@ -51,32 +51,18 @@
 
 ;; ## S3 Key Translation
 
-(defn- trim-slashes
-  "Cleans a string by removing leading and trailing slashes, then leading and
-  trailing whitespace. Returns nil if the resulting string is empty."
-  ^String
-  [string]
-  (when-not (empty? string)
-    (let [result (-> string
-                     (str/replace #"^/*([^/].*[^/])/*$" "$1")
-                     (str/trim))]
-      (when-not (empty? result)
-        result))))
-
-
 (defn- get-subkey
   "Checks an object key against a common prefix. If provided, the prefix is
   checked against the key to ensure it actually matches the beginning of the
   key. If prefix is nil, or trims down to an empty string, the key is returned
   unchanged."
   [prefix ^String object-key]
-  (if-let [prefix' (trim-slashes prefix)]
-    (do
-      (when-not (.startsWith object-key (str prefix' "/"))
-        (throw (IllegalArgumentException.
-                 (str "S3 object " object-key
-                      " is not under prefix " prefix'))))
-      (subs object-key (inc (count prefix'))))
+  (when (and prefix (not (.startsWith object-key prefix)))
+    (throw (IllegalArgumentException.
+             (str "S3 object " object-key
+                  " is not under prefix " prefix))))
+  (if prefix
+    (subs object-key (count prefix))
     object-key))
 
 
@@ -84,10 +70,7 @@
   "Converts a multihash identifier to an S3 object key, potentially applying a
   common prefix. Multihashes are rendered as hex strings."
   [prefix id]
-  (let [block-subkey (multihash/hex id)]
-    (if-let [prefix' (trim-slashes prefix)]
-      (str prefix' "/" block-subkey)
-      block-subkey)))
+  (str prefix (multihash/hex id)))
 
 
 (defn- key->id
@@ -207,6 +190,22 @@
       true)))
 
 
+
+;; ## Store Construction
+
+(defn- trim-slashes
+  "Cleans a string by removing leading and trailing slashes, then leading and
+  trailing whitespace. Returns nil if the resulting string is empty."
+  ^String
+  [string]
+  (when-not (empty? string)
+    (let [result (-> string
+                     (str/replace #"^/*([^/].*[^/])/*$" "$1")
+                     (str/trim))]
+      (when-not (empty? result)
+        result))))
+
+
 (defn s3-store
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
@@ -232,7 +231,7 @@
       (.setRegion client region))
     (S3BlockStore. client
                    (str/trim bucket)
-                   (trim-slashes (:prefix opts)))))
+                   (some-> opts :prefix trim-slashes (str "/")))))
 
 
 ;; Remove automatic constructor functions.
