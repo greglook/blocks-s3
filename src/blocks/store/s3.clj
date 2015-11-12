@@ -39,7 +39,7 @@
   if the keyword doesn't match a supported region."
   [region]
   (some->
-    (if (string? region) (keyword region) region)
+    region
     (case
       :us-west-1 Regions/US_WEST_1
       :us-west-2 Regions/US_WEST_2
@@ -214,12 +214,14 @@
   [string]
   (when-not (empty? string)
     (let [result (-> string
-                     (str/replace #"^/*([^/].*[^/])/*$" "$1")
+                     (str/replace #"^/*" "")
+                     (str/replace #"/*$" "")
                      (str/trim))]
       (when-not (empty? result)
         result))))
 
 
+; TODO: component lifecycle to create/close client
 (defn s3-store
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
@@ -245,7 +247,8 @@
       (.setRegion client region))
     (S3BlockStore. client
                    (str/trim bucket)
-                   (some-> opts :prefix trim-slashes (str "/")))))
+                   (some-> (trim-slashes (:prefix opts))
+                           (str "/")))))
 
 
 ;; Remove automatic constructor functions.
