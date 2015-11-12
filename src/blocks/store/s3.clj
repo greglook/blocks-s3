@@ -22,6 +22,7 @@
       ObjectListing
       ObjectMetadata
       PutObjectRequest
+      PutObjectResult
       S3Object
       S3ObjectSummary)))
 
@@ -69,6 +70,7 @@
 (defn- id->key
   "Converts a multihash identifier to an S3 object key, potentially applying a
   common prefix. Multihashes are rendered as hex strings."
+  ^String
   [prefix id]
   (str prefix (multihash/hex id)))
 
@@ -113,7 +115,7 @@
 
 (defn- object->block
   "Creates a lazy block to read from the given S3 object."
-  [client bucket prefix stats]
+  [^AmazonS3 client ^String bucket prefix stats]
   (block/with-stats
     (data/lazy-block
       (:id stats) (:size stats)
@@ -178,7 +180,7 @@
                          (.setContentLength (:size block)))
               result (with-open [content (block/open block)]
                        (.putObject client bucket object-key content metadata))
-              stats (metadata-stats (:id block) bucket object-key (.getMetadata result))]
+              stats (metadata-stats (:id block) bucket object-key (.getMetadata ^PutObjectResult result))]
           (object->block client bucket prefix
                          (assoc stats
                                 :size (:size block)
@@ -199,7 +201,7 @@
   [store]
   (let [^AmazonS3 client (:client store)
         object-listing (.listObjects client (:bucket store) (:prefix store))]
-    (doseq [object (.getObjectSummaries object-listing)]
+    (doseq [^S3ObjectSummary object (.getObjectSummaries object-listing)]
       (.deleteObject client (:bucket store) (.getKey object)))
     nil))
 
