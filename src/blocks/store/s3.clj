@@ -219,9 +219,11 @@
   matching the store prefix."
   [store]
   (let [^AmazonS3 client (:client store)
+        ; TODO: use lazy seq logic here
         object-listing (.listObjects client (:bucket store) (:prefix store))]
-    (doseq [^S3ObjectSummary object (.getObjectSummaries object-listing)]
-      (.deleteObject client (:bucket store) (.getKey object)))
+    (dorun (map (fn [^S3ObjectSummary object]
+                  (.deleteObject client (:bucket store) (.getKey object)))
+                (.getObjectSummaries object-listing)))
     nil))
 
 

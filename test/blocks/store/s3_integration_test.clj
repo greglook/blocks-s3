@@ -15,7 +15,6 @@
       (test-block-store
         "s3-store" store
         :blocks 25
-        :max-size 4096
-        :clean false)
-      (blocks.store.s3/erase! store))
+        :max-size 1024
+        :eraser blocks.store.s3/erase!))
     (println "No AWS_ACCESS_KEY_ID in environment, skipping integration tests.")))
