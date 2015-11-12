@@ -49,6 +49,25 @@
     (Region/getRegion)))
 
 
+(defn get-client
+  "Constructs an S3 client.
+
+  Supported options:
+
+  - `:credentials` a map with `:access-key` and `:secret-key` entries providing
+    explicit AWS credentials.
+  - `:region` a keyword or string designating the region to operate in."
+  [opts]
+  (let [client (if-let [creds (:credentials opts)]
+                 (AmazonS3Client. (BasicAWSCredentials.
+                                    (:access-key creds)
+                                    (:secret-key creds)))
+                 (AmazonS3Client.))]
+    (when-let [region (get-region (:region opts))]
+      (.setRegion client region))
+    client))
+
+
 
 ;; ## S3 Key Translation
 
@@ -223,7 +242,6 @@
         result))))
 
 
-; TODO: component lifecycle to create/close client
 (defn s3-store
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
@@ -240,17 +258,10 @@
     (throw (IllegalArgumentException.
              (str "Bucket name must be a non-empty string, got: "
                   (pr-str bucket)))))
-  (let [client (if-let [creds (:credentials opts)]
-                 (AmazonS3Client. (BasicAWSCredentials.
-                                    (:access-key creds)
-                                    (:secret-key creds)))
-                 (AmazonS3Client.))]
-    (when-let [region (get-region (:region opts))]
-      (.setRegion client region))
-    (S3BlockStore. client
-                   (str/trim bucket)
-                   (some-> (trim-slashes (:prefix opts))
-                           (str "/")))))
+  (S3BlockStore. (get-client opts)
+                 (str/trim bucket)
+                 (some-> (trim-slashes (:prefix opts))
+                         (str "/"))))
 
 
 ;; Remove automatic constructor functions.
