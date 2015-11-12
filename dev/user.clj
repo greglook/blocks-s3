@@ -3,7 +3,7 @@
     [blocks.core :as block]
     (blocks.store
       [s3 :refer [s3-store]]
-      [tests :as test :refer [random-bytes]])
+      [tests :as tests :refer [random-bytes]])
     [clojure.java.io :as io]
     [clojure.repl :refer :all]
     [clojure.stacktrace :refer [print-cause-trace]]
@@ -15,5 +15,9 @@
     multihash.core.Multihash))
 
 
-(def cloud (s3-store "greglook-data" :prefix "blocks-test-2"))
+(def cloud
+  (s3-store "greglook-data"
+            :prefix "blocks-test-2"
+            :region :us-west-2))
+
 (def s3 (:client cloud))
