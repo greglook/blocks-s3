@@ -73,10 +73,10 @@
   (if-let [prefix' (trim-slashes prefix)]
     (do
       (when-not (.startsWith object-key (str prefix' "/"))
-        (throw (IllegalStateException.
+        (throw (IllegalArgumentException.
                  (str "S3 object " object-key
                       " is not under prefix " prefix'))))
-      (subs object-key (count prefix')))
+      (subs object-key (inc (count prefix'))))
     object-key))
 
 
@@ -122,7 +122,8 @@
   {:id id
    :size (.getContentLength metadata)
    :source (s3-uri bucket object-key)
-   :stored-at (.getLastModified metadata)})
+   :stored-at (.getLastModified metadata)
+   :s3/metadata (into {} (.getRawMetadata metadata))})
 
 
 (defn- object->block
@@ -189,7 +190,10 @@
               result (with-open [content (block/open block)]
                        (.putObject client bucket object-key content metadata))
               stats (metadata-stats (:id block) bucket object-key (.getMetadata result))]
-          (object->block client bucket prefix stats)))))
+          (object->block client bucket prefix
+                         (assoc stats
+                                :size (:size block)
+                                :stored-at (java.util.Date.)))))))
 
 
   (delete!
