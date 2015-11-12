@@ -148,11 +148,14 @@
     (let [request (doto (ListObjectsRequest.)
                     (.setBucketName bucket)
                     (.setPrefix prefix)
-                    (.setMarker (:after opts))
-                    (.setMaxKeys (:limit opts)))
-          response (.listObjects client request)]
+                    (.setMarker (str prefix (:after opts))))]
+      (when-let [limit (:limit opts)]
+        (.setMaxKeys request (int limit)))
       ; TODO: check if isTruncated is true, make lazy seq which respects :limit
-      (map (partial summary-stats prefix) (.getObjectSummaries response))))
+      ; see: listNextBatchOfObjects(ObjectListing)
+      (->> (.listObjects client request)
+           (.getObjectSummaries)
+           (map (partial summary-stats prefix)))))
 
 
   (-get
