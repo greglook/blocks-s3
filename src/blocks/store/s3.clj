@@ -151,10 +151,10 @@
   specified number of object summaries."
   [^AmazonS3 client ^ListObjectsRequest request]
   (lazy-seq
-    (log/infof "ListObjects in %s after %s limit %s"
-               (s3-uri (.getBucketName request) (.getPrefix request))
-               (pr-str (.getMarker request))
-               (pr-str (.getMaxKeys request)))
+    (log/debugf "ListObjects in %s after %s limit %s"
+                (s3-uri (.getBucketName request) (.getPrefix request))
+                (pr-str (.getMarker request))
+                (pr-str (.getMaxKeys request)))
     (let [limit (.getMaxKeys request)
           listing (.listObjects client request)
           summaries (seq (.getObjectSummaries listing))
