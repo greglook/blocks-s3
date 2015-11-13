@@ -4,6 +4,7 @@
     [blocks.core :as block]
     [blocks.data :as data]
     [clojure.string :as str]
+    [clojure.tools.logging :as log]
     [multihash.core :as multihash])
   (:import
     (com.amazonaws.auth
@@ -139,6 +140,7 @@
       (:id stats) (:size stats)
       (let [object-key (id->key prefix (:id stats))]
         (fn object-reader []
+          (log/debugf "Opening object %s" (s3-uri bucket object-key))
           (.getObjectContent (.getObject client bucket object-key)))))
     (dissoc stats :id :size)))
 
@@ -155,6 +157,7 @@
     [this id]
     (let [object-key (id->key prefix id)]
       (try
+        (log/debugf "GetObjectMetadata %s" (s3-uri bucket object-key))
         (let [response (.getObjectMetadata client bucket object-key)]
           (metadata-stats id bucket object-key response))
         (catch AmazonS3Exception ex
@@ -195,20 +198,23 @@
         (let [object-key (id->key prefix (:id block))
               ; TODO: Idea - allow expiry argument or function which allows you to mutate the ObjectMetadata before it is sent in the putObject call.
               metadata (doto (ObjectMetadata.)
-                         (.setContentLength (:size block)))
-              result (with-open [content (block/open block)]
-                       (.putObject client bucket object-key content metadata))
-              stats (metadata-stats (:id block) bucket object-key (.getMetadata ^PutObjectResult result))]
-          (object->block client bucket prefix
-                         (assoc stats
-                                :size (:size block)
-                                :stored-at (java.util.Date.)))))))
+                         (.setContentLength (:size block)))]
+          (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
+          (let [result (with-open [content (block/open block)]
+                         (.putObject client bucket object-key content metadata))
+                stats (metadata-stats (:id block) bucket object-key
+                                      (.getMetadata ^PutObjectResult result))]
+            (object->block client bucket prefix
+                           (assoc stats
+                                  :size (:size block)
+                                  :stored-at (java.util.Date.))))))))
 
 
   (delete!
     [this id]
     (when (.stat this id)
       (let [object-key (id->key prefix id)]
+        (log/debugf "DeleteObject %s" (s3-uri bucket object-key))
         (.deleteObject client bucket object-key))
       true)))
 
