@@ -39,14 +39,13 @@
   "Translates a Clojure keyword into an S3 region instance. Throws an exception
   if the keyword doesn't match a supported region."
   [region]
-  (some->
-    region
-    (case
-      :us-west-1 Regions/US_WEST_1
-      :us-west-2 Regions/US_WEST_2
-      (throw (IllegalArgumentException.
-               (str "No supported region matching " (pr-str region)))))
-    (Region/getRegion)))
+  (when region
+    (Region/getRegion
+      (case region
+        :us-west-1 Regions/US_WEST_1
+        :us-west-2 Regions/US_WEST_2
+        (throw (IllegalArgumentException.
+                 (str "No supported region matching " (pr-str region))))))))
 
 
 (defn get-client
