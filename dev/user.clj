@@ -3,7 +3,7 @@
     [blocks.core :as block]
     (blocks.store
       [s3 :refer [s3-store]]
-      [tests :as tests :refer [random-bytes]])
+      [tests :as tests])
     [clojure.java.io :as io]
     [clojure.repl :refer :all]
     [clojure.stacktrace :refer [print-cause-trace]]
