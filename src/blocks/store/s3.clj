@@ -189,7 +189,7 @@
         (.setMaxKeys request (int limit)))
       (->> (list-objects-seq client request)
            (map (partial summary-stats prefix))
-           (block/select-stats opts))))
+           (util/select-stats opts))))
 
 
   (-get
