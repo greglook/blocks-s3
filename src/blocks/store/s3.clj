@@ -1,8 +1,10 @@
 (ns blocks.store.s3
   "Block storage backed by a bucket in Amazon S3."
   (:require
-    [blocks.core :as block]
-    [blocks.data :as data]
+    (blocks
+      [core :as block]
+      [data :as data]
+      [util :as util])
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [multihash.core :as multihash])
@@ -72,21 +74,6 @@
 
 ;; ## S3 Key Translation
 
-(defn- get-subkey
-  "Checks an object key against a common prefix. If provided, the prefix is
-  checked against the key to ensure it actually matches the beginning of the
-  key. If prefix is nil, or trims down to an empty string, the key is returned
-  unchanged."
-  [prefix ^String object-key]
-  (when (and prefix (not (.startsWith object-key prefix)))
-    (throw (IllegalArgumentException.
-             (str "S3 object " object-key
-                  " is not under prefix " prefix))))
-  (if prefix
-    (subs object-key (count prefix))
-    object-key))
-
-
 (defn- id->key
   "Converts a multihash identifier to an S3 object key, potentially applying a
   common prefix. Multihashes are rendered as hex strings."
@@ -99,16 +86,16 @@
   "Converts an S3 object key into a multihash identifier, potentially stripping
   out a common prefix. The block subkey must be a valid hex-encoded multihash."
   [prefix object-key]
-  (let [block-subkey (get-subkey prefix object-key)]
-    ; TODO: this should log a warning and return nil
-    (when (empty? block-subkey)
-      (throw (IllegalStateException.
-               (str "Cannot parse id from empty block subkey: " object-key))))
-    ; TODO: this should log a warning and return nil
-    (when-not (re-matches #"^[0-9a-f]+$" block-subkey)
-      (throw (IllegalStateException.
-               (str "Block subkey " block-subkey " is not valid hexadecimal"))))
-    (multihash/decode block-subkey)))
+  (some->
+    object-key
+    (util/check #(.startsWith ^String % (or prefix ""))
+      (log/warnf "S3 object %s is not under prefix %s"
+                 object-key (pr-str prefix)))
+    (cond-> prefix (subs (count prefix)))
+    (util/check util/hex?
+      (log/warnf "Encountered block subkey with invalid hex: %s"
+                 (pr-str value)))
+    (multihash/decode)))
 
 
 
