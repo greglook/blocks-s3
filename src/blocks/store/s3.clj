@@ -19,6 +19,7 @@
       AmazonS3Exception
       Bucket
       GetObjectRequest
+      ListNextBatchOfObjectsRequest
       ListObjectsRequest
       ObjectListing
       ObjectMetadata
@@ -145,6 +146,31 @@
     (dissoc stats :id :size)))
 
 
+(defn- list-objects-seq
+  "Produces a lazy sequence which calls S3 ListObjects API for up to the
+  specified number of object summaries."
+  [^AmazonS3 client ^ListObjectsRequest request]
+  (lazy-seq
+    (log/infof "ListObjects in %s after %s limit %s"
+               (s3-uri (.getBucketName request) (.getPrefix request))
+               (pr-str (.getMarker request))
+               (pr-str (.getMaxKeys request)))
+    (let [limit (.getMaxKeys request)
+          listing (.listObjects client request)
+          summaries (seq (.getObjectSummaries listing))
+          new-limit (and limit (- limit (count summaries)))]
+      (when summaries
+        (concat summaries
+                (when (and (.isTruncated listing)
+                           (or (nil? new-limit)
+                               (pos? new-limit)))
+                  (let [next-batch (ListNextBatchOfObjectsRequest. listing)
+                        new-request (doto (.toListObjectsRequest next-batch)
+                                      (.setMaxKeys (and new-limit
+                                                        (int new-limit))))]
+                    (list-objects-seq client new-request))))))))
+
+
 ;; Block records are stored in a bucket in S3, under some key prefix.
 (defrecord S3BlockStore
   [^AmazonS3 client
@@ -174,11 +200,9 @@
                     (.setMarker (str prefix (:after opts))))]
       (when-let [limit (:limit opts)]
         (.setMaxKeys request (int limit)))
-      ; TODO: check if isTruncated is true, make lazy seq which respects :limit
-      ; see: listNextBatchOfObjects(ObjectListing)
-      (->> (.listObjects client request)
-           (.getObjectSummaries)
-           (map (partial summary-stats prefix)))))
+      (->> (list-objects-seq client request)
+           (map (partial summary-stats prefix))
+           (block/select-stats opts))))
 
 
   (-get
@@ -224,11 +248,15 @@
   matching the store prefix."
   [store]
   (let [^AmazonS3 client (:client store)
-        ; TODO: use lazy seq logic here
-        object-listing (.listObjects client (:bucket store) (:prefix store))]
-    (dorun (map (fn [^S3ObjectSummary object]
-                  (.deleteObject client (:bucket store) (.getKey object)))
-                (.getObjectSummaries object-listing)))
+        request (doto (ListObjectsRequest.)
+                  (.setBucketName (:bucket store))
+                  (.setPrefix (:prefix store)))]
+    (log/warnf "Erasing all objects under %s"
+               (s3-uri (:bucket store) (:prefix store)))
+    (->> (list-objects-seq client request)
+         (map (fn [^S3ObjectSummary object]
+                (.deleteObject client (:bucket store) (.getKey object))))
+         (dorun))
     nil))
 
 
