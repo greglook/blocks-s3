@@ -2,7 +2,65 @@
   (:require
     (blocks.store
       [s3 :as s3 :refer [s3-store]])
-    [clojure.test :refer :all]))
+    [clojure.test :refer :all]
+    [multihash.core :as multihash])
+  (:import
+    (com.amazonaws.services.s3.model
+      ObjectMetadata
+      S3ObjectSummary)))
+
+
+(deftest key-parsing
+  (testing "id->key"
+    (let [id->key @#'s3/id->key]
+      (is (= "foo/bar/11040123abcd" (id->key "foo/bar/" (multihash/decode "11040123abcd")))
+          "id maps to hex encoding under prefix")))
+  (testing "key->id"
+    (let [key->id @#'s3/key->id
+          mhash (multihash/decode "11040123abcd")]
+      (is (nil? (key->id nil nil))
+          "should return nil for nil key")
+      (is (nil? (key->id "baz/" "foo/bar/11040123abcd"))
+          "should return nil for mismatched prefix")
+      (is (nil? (key->id nil "x1040123abcd"))
+          "should return nil for non-hex key")
+      (is (= mhash (key->id nil "11040123abcd"))
+          "should return mhash for valid key with no prefix")
+      (is (= mhash (key->id "foo/" "foo/11040123abcd"))
+          "should return mhash for valid key with prefix"))))
+
+
+(deftest stat-conversion
+  (let [mhash (multihash/decode "11040123abcd")
+        date (java.util.Date.)
+        summary-stats @#'s3/summary-stats
+        metadata-stats @#'s3/metadata-stats]
+    (testing "summary-stats"
+      (is (= {:id mhash
+              :size 45
+              :source (java.net.URI. "s3://test-bucket/foo/bar/11040123abcd")
+              :stored-at date}
+             (summary-stats
+               "foo/bar/"
+               (doto (S3ObjectSummary.)
+                 (.setBucketName "test-bucket")
+                 (.setKey "foo/bar/11040123abcd")
+                 (.setSize 45)
+                 (.setLastModified date))))))
+    (testing "metadata-stats"
+      (is (= {:id mhash
+              :size 45
+              :source (java.net.URI. "s3://test-bucket/foo/bar/11040123abcd")
+              :stored-at date}
+             (dissoc
+               (metadata-stats
+                 mhash
+                 "test-bucket"
+                 "foo/bar/11040123abcd"
+                 (doto (ObjectMetadata.)
+                   (.setContentLength 45)
+                   (.setLastModified date)))
+               :s3/metadata))))))
 
 
 (deftest client-construction
