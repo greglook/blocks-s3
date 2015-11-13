@@ -5,7 +5,11 @@
             :url "http://unlicense.org/"}
 
   :deploy-branches ["master"]
-  :test-selectors {:default (complement :integration)
+
+  :aliases {"coverage" ["with-profile" "+test,+coverage" "cloverage"]
+            "integration" ["with-profile" "+integration"]}
+
+  :test-selectors {:unit (complement :integration)
                    :integration :integration}
 
   :dependencies
@@ -20,6 +24,8 @@
                'blocks.data.Block {'blocks.data.Block (partial into {})}}}
 
   :profiles
-  {:dev {:dependencies [[com.fasterxml.jackson.core/jackson-databind "2.6.3"]]}
-   :repl {:source-paths ["dev"]
-          :dependencies [[org.clojure/tools.namespace "0.2.10"]]}})
+  {:repl {:source-paths ["dev"]
+          :dependencies [[org.clojure/tools.namespace "0.2.10"]]}
+   :test {:jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
+   :coverage {:dependencies [[com.fasterxml.jackson.core/jackson-databind "2.6.3"]]}
+   :integration {:test-paths ["test-integration"]}})
