@@ -13,11 +13,18 @@
    [org.clojure/clojure "1.7.0"]
    [org.clojure/tools.logging "0.3.1"]]
 
-  :aliases {"coverage" ["with-profile" "+test,+coverage" "cloverage"]
+  :aliases {"doc-lit" ["marg" "--dir" "doc/marginalia"]
+            "coverage" ["with-profile" "+test,+coverage" "cloverage"]
             "integration" ["with-profile" "+integration"]}
 
   :test-selectors {:unit (complement :integration)
                    :integration :integration}
+
+  :codox
+  {:metadata {:doc/format :markdown}
+   :source-uri "https://github.com/greglook/blocks-s3/blob/master/{filepath}#L{line}"
+   :doc-paths ["doc/extra"]
+   :output-path "doc/api"}
 
   :whidbey
   {:tag-types {'multihash.core.Multihash {'data/hash 'multihash.core/base58}
