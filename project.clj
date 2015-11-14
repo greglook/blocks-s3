@@ -7,7 +7,7 @@
   :deploy-branches ["master"]
 
   :dependencies
-  [[com.amazonaws/aws-java-sdk-s3 "1.10.32"]
+  [[com.amazonaws/aws-java-sdk-s3 "1.10.34"]
    [mvxcvi/blocks "0.4.2"]
    [mvxcvi/multihash "1.1.0"]
    [org.clojure/clojure "1.7.0"]
