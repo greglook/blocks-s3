@@ -1,12 +1,18 @@
 (ns blocks.store.s3-test
   (:require
+    [blocks.core :as block]
     (blocks.store
       [s3 :as s3 :refer [s3-store]])
     [clojure.test :refer :all]
     [multihash.core :as multihash])
   (:import
+    (com.amazonaws.services.s3
+      AmazonS3)
     (com.amazonaws.services.s3.model
+      ListObjectsRequest
+      ObjectListing
       ObjectMetadata
+      S3Object
       S3ObjectSummary)))
 
 
@@ -61,6 +67,105 @@
                    (.setContentLength 45)
                    (.setLastModified date)))
                :s3/metadata))))))
+
+
+(deftest block-creation
+  (let [object->block @#'s3/object->block
+        reference (block/read! "this is a block")
+        calls (atom [])
+        client (reify AmazonS3
+                 (^S3Object getObject
+                   [this ^String bucket ^String object-key]
+                   (swap! calls conj [:getObject bucket object-key])
+                   (doto (S3Object.)
+                     (.setObjectContent (block/open reference)))))
+        block (object->block client "blocket" "data/test/"
+                             {:id (:id reference), :size (:size reference)})]
+    (is (not (realized? block)) "should return lazy block")
+    (is (= (:id reference) (:id block)) "returns correct id")
+    (is (= (:size reference) (:size block)) "returns correct size")
+    (is (empty? @calls) "no calls to S3 on block init")
+    (is (= "this is a block" (slurp (block/open block)))
+        "returns correct content from mock open")
+    (is (= [[:getObject "blocket" (str "data/test/" (multihash/hex (:id reference)))]]
+           @calls)
+        "makes one call to getObject for open")))
+
+
+(deftest lazy-object-listing
+  (let [list-objects-seq @#'s3/list-objects-seq
+        bucket "blocket"
+        prefix "data/"
+        calls (atom nil)
+        object-listing (fn [truncated? summaries]
+                         (proxy [ObjectListing] []
+                           (getObjectSummaries [] summaries)
+                           (getBucketName [] bucket)
+                           (getPrefix [] prefix)
+                           (isTruncated [] (boolean truncated?))))
+        list-client (fn [results]
+                      (let [responses (atom (seq results))]
+                        (reify AmazonS3
+                          (^ObjectListing listObjects
+                           [this ^ListObjectsRequest request]
+                           (swap! calls conj [:listObject request])
+                           (let [result (first @responses)]
+                             (swap! responses next)
+                             result)))))]
+    (testing "empty listing"
+      (reset! calls [])
+      (let [client (list-client [(object-listing false [])])
+            request (doto (ListObjectsRequest.)
+                      (.setBucketName bucket)
+                      (.setPrefix prefix))
+            listing (list-objects-seq client request)]
+        (is (not (realized? listing)) "should create a lazy sequence")
+        (is (empty? @calls) "should not make any calls until accessed")
+        (is (empty? listing) "listing is empty seq")
+        (is (= 1 (count @calls)) "should make one call")
+        (is (= :listObject (first (first @calls))) "should make one listObjects call")
+        (is (= request (second (first @calls))) "should use initial list request")))
+    (testing "full listing with no limit"
+      (reset! calls [])
+      (let [client (list-client [(object-listing false [::one ::two ::three])])
+            request (doto (ListObjectsRequest.)
+                      (.setBucketName bucket)
+                      (.setPrefix prefix))
+            listing (list-objects-seq client request)]
+        (is (empty? @calls) "should not make any calls until accessed")
+        (is (= [::one ::two ::three] listing) "listing has three elements")
+        (is (= 1 (count @calls)) "should make one call")))
+    (testing "full listing with limited results"
+      (reset! calls [])
+      (let [client (list-client [(object-listing true  [::one ::two])
+                                 (object-listing false [::three ::four])])
+            request (doto (ListObjectsRequest.)
+                      (.setBucketName bucket)
+                      (.setPrefix prefix)
+                      (.setMaxKeys (int 4)))
+            listing (list-objects-seq client request)]
+        (is (empty? @calls) "should not make any calls until accessed")
+        (is (= ::one (first listing)) "first element from listing")
+        (is (= 1 (count @calls)) "should make one call for first element")
+        (is (= [::one ::two ::three ::four] listing) "full listing has four elements")
+        (is (= 2 (count @calls)) "should make second call for full listing")
+        (let [req (second (second @calls))]
+          (is (= 2 (.getMaxKeys req)) "second call should reduce limit"))))
+    (testing "full listing with truncated results"
+      (reset! calls [])
+      (let [client (list-client [(object-listing true  [::one ::two])
+                                 (object-listing false [::three ::four])])
+            request (doto (ListObjectsRequest.)
+                      (.setBucketName bucket)
+                      (.setPrefix prefix))
+            listing (list-objects-seq client request)]
+        (is (empty? @calls) "should not make any calls until accessed")
+        (is (= ::one (first listing)) "first element from listing")
+        (is (= 1 (count @calls)) "should make one call for first element")
+        (is (= [::one ::two ::three ::four] listing) "full listing has four elements")
+        (is (= 2 (count @calls)) "should make second call for full listing")
+        (let [req (second (second @calls))]
+          (is (nil? (.getMaxKeys req)) "second call should not have limit"))))))
 
 
 (deftest client-construction
