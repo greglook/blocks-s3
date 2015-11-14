@@ -28,7 +28,8 @@
           :dependencies [[org.clojure/tools.namespace "0.2.11"]]}
    :test {:dependencies [[commons-logging "1.2"]]
           :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
-   :coverage {:dependencies [[com.fasterxml.jackson.core/jackson-databind "2.6.3"]]
+   :coverage {:plugins [[lein-cloverage "1.0.6"]]
+              :dependencies [[com.fasterxml.jackson.core/jackson-databind "2.6.3"]]
               :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                          "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}
    :integration {:test-paths ["test-integration"]}})
