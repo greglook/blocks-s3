@@ -127,9 +127,16 @@
     (data/lazy-block
       (:id stats) (:size stats)
       (let [object-key (id->key prefix (:id stats))]
-        (fn object-reader []
-          (log/debugf "Opening object %s" (s3-uri bucket object-key))
-          (.getObjectContent (.getObject client bucket object-key)))))
+        (fn object-reader
+          ([]
+           (log/debugf "Opening object %s" (s3-uri bucket object-key))
+           (.getObjectContent (.getObject client bucket object-key)))
+          ([^long start ^long end]
+           (log/debugf "Opening object %s byte range [%d, %d]"
+                       (s3-uri bucket object-key) start end)
+           (let [request (doto (GetObjectRequest. bucket object-key)
+                           (.setRange start end))]
+             (.getObjectContent (.getObject client request)))))))
     (dissoc stats :id :size)))
 
 
