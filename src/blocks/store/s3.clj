@@ -44,6 +44,7 @@
   if the keyword doesn't match a supported region."
   [region]
   (when region
+    ; TODO: use reflection here?
     (Region/getRegion
       (case region
         :us-west-1 Regions/US_WEST_1
@@ -214,7 +215,7 @@
         (object->block client bucket prefix stats)
         ; Otherwise, upload block to S3.
         (let [object-key (id->key prefix (:id block))
-              ; TODO: Idea - allow expiry argument or function which allows you to mutate the ObjectMetadata before it is sent in the putObject call.
+              ; TODO: support function which allows you to mutate the ObjectMetadata before it is sent in the putObject call?
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
