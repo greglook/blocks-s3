@@ -7,7 +7,7 @@
   :deploy-branches ["master"]
 
   :dependencies
-  [[com.amazonaws/aws-java-sdk-s3 "1.10.34"]
+  [[com.amazonaws/aws-java-sdk-s3 "1.10.45"]
    [mvxcvi/blocks "0.5.0"]
    [mvxcvi/multihash "1.1.0"]
    [org.clojure/clojure "1.7.0"]
@@ -36,7 +36,7 @@
    :test {:dependencies [[commons-logging "1.2"]]
           :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
    :coverage {:plugins [[lein-cloverage "1.0.6"]]
-              :dependencies [[com.fasterxml.jackson.core/jackson-databind "2.6.3"]]
+              :dependencies [[com.fasterxml.jackson.core/jackson-databind "2.7.0"]]
               :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                          "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}
    :integration {:test-paths ["test-integration"]}})
