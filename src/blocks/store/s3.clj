@@ -4,7 +4,8 @@
     (blocks
       [core :as block]
       [data :as data]
-      [util :as util])
+      [store :as store])
+    [blocks.store.util :as util]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [multihash.core :as multihash])
@@ -172,9 +173,9 @@
    ^String bucket
    ^String prefix]
 
-  block/BlockStore
+  store/BlockStore
 
-  (stat
+  (-stat
     [this id]
     (let [object-key (id->key prefix id)]
       (try
@@ -202,15 +203,15 @@
 
   (-get
     [this id]
-    (when-let [stats (.stat this id)]
+    (when-let [stats (.-stat this id)]
       (object->block client bucket prefix stats)))
 
 
-  (put!
+  (-put!
     [this block]
     (data/merge-blocks
       block
-      (if-let [stats (.stat this (:id block))]
+      (if-let [stats (.-stat this (:id block))]
         ; Block already exists, return lazy block.
         (object->block client bucket prefix stats)
         ; Otherwise, upload block to S3.
@@ -229,9 +230,9 @@
                                   :stored-at (java.util.Date.))))))))
 
 
-  (delete!
+  (-delete!
     [this id]
-    (when (.stat this id)
+    (when (.-stat this id)
       (let [object-key (id->key prefix id)]
         (log/debugf "DeleteObject %s" (s3-uri bucket object-key))
         (.deleteObject client bucket object-key))

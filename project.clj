@@ -8,7 +8,7 @@
 
   :dependencies
   [[com.amazonaws/aws-java-sdk-s3 "1.10.45"]
-   [mvxcvi/blocks "0.5.0"]
+   [mvxcvi/blocks "0.6.0"]
    [mvxcvi/multihash "1.1.0"]
    [org.clojure/clojure "1.7.0"]
    [org.clojure/tools.logging "0.3.1"]]
