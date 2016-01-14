@@ -4,7 +4,8 @@
     (blocks
       [core :as block]
       [data :as data]
-      [util :as util])
+      [store :as store])
+    [blocks.store.util :as util]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [multihash.core :as multihash])
@@ -44,6 +45,7 @@
   if the keyword doesn't match a supported region."
   [region]
   (when region
+    ; TODO: use reflection here?
     (Region/getRegion
       (case region
         :us-west-1 Regions/US_WEST_1
@@ -127,9 +129,16 @@
     (data/lazy-block
       (:id stats) (:size stats)
       (let [object-key (id->key prefix (:id stats))]
-        (fn object-reader []
-          (log/debugf "Opening object %s" (s3-uri bucket object-key))
-          (.getObjectContent (.getObject client bucket object-key)))))
+        (fn object-reader
+          ([]
+           (log/debugf "Opening object %s" (s3-uri bucket object-key))
+           (.getObjectContent (.getObject client bucket object-key)))
+          ([^long start ^long end]
+           (log/debugf "Opening object %s byte range [%d, %d)"
+                       (s3-uri bucket object-key) start end)
+           (let [request (doto (GetObjectRequest. bucket object-key)
+                           (.setRange start (dec end)))]
+             (.getObjectContent (.getObject client request)))))))
     (dissoc stats :id :size)))
 
 
@@ -164,9 +173,9 @@
    ^String bucket
    ^String prefix]
 
-  block/BlockStore
+  store/BlockStore
 
-  (stat
+  (-stat
     [this id]
     (let [object-key (id->key prefix id)]
       (try
@@ -194,20 +203,20 @@
 
   (-get
     [this id]
-    (when-let [stats (.stat this id)]
+    (when-let [stats (.-stat this id)]
       (object->block client bucket prefix stats)))
 
 
-  (put!
+  (-put!
     [this block]
     (data/merge-blocks
       block
-      (if-let [stats (.stat this (:id block))]
+      (if-let [stats (.-stat this (:id block))]
         ; Block already exists, return lazy block.
         (object->block client bucket prefix stats)
         ; Otherwise, upload block to S3.
         (let [object-key (id->key prefix (:id block))
-              ; TODO: Idea - allow expiry argument or function which allows you to mutate the ObjectMetadata before it is sent in the putObject call.
+              ; TODO: support function which allows you to mutate the ObjectMetadata before it is sent in the putObject call?
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
@@ -221,9 +230,9 @@
                                   :stored-at (java.util.Date.))))))))
 
 
-  (delete!
+  (-delete!
     [this id]
-    (when (.stat this id)
+    (when (.-stat this id)
       (let [object-key (id->key prefix id)]
         (log/debugf "DeleteObject %s" (s3-uri bucket object-key))
         (.deleteObject client bucket object-key))
