@@ -13,9 +13,9 @@
    [org.clojure/clojure "1.7.0"]
    [org.clojure/tools.logging "0.3.1"]]
 
-  :aliases {"doc-lit" ["marg" "--dir" "doc/marginalia"]
-            "coverage" ["with-profile" "+test,+coverage" "cloverage"]
-            "integration" ["with-profile" "+integration"]}
+  :aliases {"docs" ["do" ["codox"] ["doc-lit"]]
+            "doc-lit" ["marg" "--dir" "doc/marginalia"]
+            "coverage" ["with-profile" "+test,+coverage" "cloverage"]}
 
   :test-selectors {:unit (complement :integration)
                    :integration :integration}
@@ -38,5 +38,4 @@
    :coverage {:plugins [[lein-cloverage "1.0.6"]]
               :dependencies [[com.fasterxml.jackson.core/jackson-databind "2.7.3"]]
               :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
-                         "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}
-   :integration {:test-paths ["test-integration"]}})
+                         "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
