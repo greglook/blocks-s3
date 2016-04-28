@@ -232,11 +232,12 @@
 
   (-delete!
     [this id]
-    (when (.-stat this id)
+    (if (.-stat this id)
       (let [object-key (id->key prefix id)]
         (log/debugf "DeleteObject %s" (s3-uri bucket object-key))
-        (.deleteObject client bucket object-key))
-      true)))
+        (.deleteObject client bucket object-key)
+        true)
+      false)))
 
 
 (defn erase!
