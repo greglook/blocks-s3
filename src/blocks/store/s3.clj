@@ -94,7 +94,7 @@
       (log/warnf "S3 object %s is not under prefix %s"
                  object-key (pr-str prefix)))
     (cond-> prefix (subs (count prefix)))
-    (util/check util/hex?
+    (util/check #(re-matches #"[0-9a-fA-F]+" %)
       (log/warnf "Encountered block subkey with invalid hex: %s"
                  (pr-str value)))
     (multihash/decode)))
