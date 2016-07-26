@@ -2,7 +2,8 @@
   (:require
     [blocks.core :as block]
     (blocks.store
-      [s3 :as s3 :refer [s3-store]])
+      [s3 :as s3 :refer [s3-store]]
+      [tests :as tests])
     [clojure.test :refer :all]
     [multihash.core :as multihash])
   (:import
@@ -15,6 +16,8 @@
       S3Object
       S3ObjectSummary)))
 
+
+;; ## Unit Tests
 
 (deftest key-parsing
   (testing "id->key"
@@ -193,3 +196,22 @@
   (is (nil? (:prefix (s3-store "foo-bucket" :prefix "/"))))
   (is (= "foo/" (:prefix (s3-store "foo-bucket" :prefix "foo"))))
   (is (= "bar/" (:prefix (s3-store "foo-bucket" :prefix "bar/")))))
+
+
+
+;; ## Integration Tests
+
+(def access-key-var "AWS_ACCESS_KEY_ID")
+(def s3-bucket-var  "BLOCKS_S3_BUCKET")
+
+
+(deftest ^:integration check-s3-store
+  (if (System/getenv access-key-var)
+    (if-let [bucket (System/getenv s3-bucket-var)]
+      (let [prefix (str *ns* "/" (System/currentTimeMillis))]
+        (tests/check-store!
+          #(s3-store bucket :prefix prefix :region :us-west-2)
+          :eraser blocks.store.s3/erase!
+          :iterations 20))
+      (println "No" s3-bucket-var "in environment, skipping integration test!"))
+    (println "No" access-key-var "in environment, skipping integration test!")))

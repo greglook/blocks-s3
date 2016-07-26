@@ -2,7 +2,7 @@ blocks-s3
 =========
 
 [![Dependency Status](https://www.versioneye.com/user/projects/5646aca2b5b03d001f00081e/badge.svg?style=flat)](https://www.versioneye.com/user/projects/5646aca2b5b03d001f00081e)
-[![Build Status](https://travis-ci.org/greglook/blocks-s3.svg?branch=develop)](https://travis-ci.org/greglook/blocks-s3)
+[![CircleCI](https://circleci.com/gh/greglook/blocks-s3.svg?style=shield&circle-token=2d7ae95392368c6f66dd93ab63420d0498f2b2fc)](https://circleci.com/gh/greglook/blocks-s3)
 [![Coverage Status](https://coveralls.io/repos/greglook/blocks-s3/badge.svg?branch=develop&service=github)](https://coveralls.io/github/greglook/blocks-s3?branch=develop)
 [![API codox](https://img.shields.io/badge/doc-API-blue.svg)](https://greglook.github.io/blocks-s3/api/)
 [![marginalia docs](https://img.shields.io/badge/doc-marginalia-blue.svg)](https://greglook.github.io/blocks-s3/marginalia/uberdoc.html)

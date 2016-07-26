@@ -7,6 +7,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+...
+
+## [0.2.1] - 2016-07-26
+
+### Changed
+- Switch to CircleCI for testing.
+- Upgrade dependency verisons.
+
 ## [0.2.0] - 2016-01-14
 
 ### Added
@@ -19,5 +27,6 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Initial library release.
 
-[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.2.0...HEAD
+[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.2.1...HEAD
+[0.2.1]: https://github.com/greglook/blocks-s3/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/greglook/blocks-s3/compare/0.1.0...0.2.0

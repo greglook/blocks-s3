@@ -15,9 +15,7 @@
     multihash.core.Multihash))
 
 
-(def cloud
-  (s3-store "greglook-data"
-            :prefix "blocks-test-2"
+(def store
+  (s3-store (System/getenv "BLOCKS_S3_BUCKET")
+            :prefix "blocks-s3-repl"
             :region :us-west-2))
-
-(def s3 (:client cloud))
