@@ -4,6 +4,11 @@
   :license {:name "Public Domain"
             :url "http://unlicense.org/"}
 
+  :aliases
+  {"docs" ["do" ["codox"] ["doc-lit"]]
+   "doc-lit" ["marg" "--dir" "doc/marginalia"]
+   "coverage" ["with-profile" "+test,+coverage" "cloverage"]}
+
   :deploy-branches ["master"]
   :pedantic? :abort
 
@@ -12,13 +17,8 @@
    [org.clojure/tools.logging "0.3.1"]
    [com.amazonaws/aws-java-sdk-s3 "1.11.20"]
    [commons-logging "1.2"]
-   [mvxcvi/blocks "0.7.0"]
-   [mvxcvi/multihash "2.0.0"]]
-
-  :aliases
-  {"docs" ["do" ["codox"] ["doc-lit"]]
-   "doc-lit" ["marg" "--dir" "doc/marginalia"]
-   "coverage" ["with-profile" "+test,+coverage" "cloverage"]}
+   [mvxcvi/blocks "0.7.1"]
+   [mvxcvi/multihash "2.0.1"]]
 
   :test-selectors
   {:unit (complement :integration)
@@ -44,6 +44,6 @@
 
    :coverage
    {:plugins [[rfkm/lein-cloverage "1.0.8"]]
-    :dependencies [[com.fasterxml.jackson.core/jackson-databind "2.8.1"]]
+    :dependencies [[com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.6.6"]]
     :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
