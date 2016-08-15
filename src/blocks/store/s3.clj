@@ -274,7 +274,7 @@
         result))))
 
 
-(defn s3-store
+(defn s3-block-store
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
 
@@ -290,10 +290,24 @@
     (throw (IllegalArgumentException.
              (str "Bucket name must be a non-empty string, got: "
                   (pr-str bucket)))))
-  (S3BlockStore. (get-client opts)
-                 (str/trim bucket)
-                 (some-> (trim-slashes (:prefix opts))
-                         (str "/"))))
+  (map->S3BlockStore
+    (merge
+      (dissoc opts :credentials :region)
+      {:client (get-client (select-keys opts [:credentials :region]))
+       :bucket (str/trim bucket)
+       :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))})))
+
+
+(defmethod store/initialize "s3"
+  [location]
+  (let [uri (util/parse-uri location)]
+    (s3-block-store
+      (:host uri)
+      :prefix (:path uri)
+      :region (keyword (get-in uri [:query :region]))
+      :credentials (when-let [creds (:user-info uri)]
+                     {:access-key (:id creds)
+                      :secret-key (:secret creds)}))))
 
 
 ;; Remove automatic constructor functions.
