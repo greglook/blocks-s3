@@ -9,6 +9,14 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ...
 
+## [0.3.0] - 2016-08-14
+
+### Changed
+- Upgrade to `[blocks "0.8.0"]`
+
+### Added
+- Implement `blocks.store/initialize` for S3BlockStore.
+
 ## [0.2.1] - 2016-07-26
 
 ### Changed
@@ -27,6 +35,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Initial library release.
 
-[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/greglook/blocks-s3/compare/0.2.1...0.3.0
 [0.2.1]: https://github.com/greglook/blocks-s3/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/greglook/blocks-s3/compare/0.1.0...0.2.0

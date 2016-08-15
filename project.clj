@@ -1,4 +1,4 @@
-(defproject mvxcvi/blocks-s3 "0.2.1"
+(defproject mvxcvi/blocks-s3 "0.3.0"
   :description "Content-addressable S3 block store."
   :url "https://github.com/greglook/blocks-s3"
   :license {:name "Public Domain"
@@ -17,7 +17,7 @@
    [org.clojure/tools.logging "0.3.1"]
    [com.amazonaws/aws-java-sdk-s3 "1.11.20"]
    [commons-logging "1.2"]
-   [mvxcvi/blocks "0.7.1"]
+   [mvxcvi/blocks "0.8.0"]
    [mvxcvi/multihash "2.0.1"]]
 
   :test-selectors
