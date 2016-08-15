@@ -2,7 +2,7 @@
   (:require
     [blocks.core :as block]
     (blocks.store
-      [s3 :as s3 :refer [s3-store]]
+      [s3 :as s3 :refer [s3-block-store]]
       [tests :as tests])
     [clojure.test :refer :all]
     [multihash.core :as multihash])
@@ -84,7 +84,7 @@
                      (.setObjectContent (block/open reference)))))
         block (object->block client "blocket" "data/test/"
                              {:id (:id reference), :size (:size reference)})]
-    (is (not (realized? block)) "should return lazy block")
+    (is (nil? @block) "should return lazy block")
     (is (= (:id reference) (:id block)) "returns correct id")
     (is (= (:size reference) (:size block)) "returns correct size")
     (is (empty? @calls) "no calls to S3 on block init")
@@ -186,16 +186,16 @@
 
 (deftest store-construction
   (is (thrown? IllegalArgumentException
-               (s3-store nil))
+               (s3-block-store nil))
       "bucket name should be required")
   (is (thrown? IllegalArgumentException
-               (s3-store "   "))
+               (s3-block-store "   "))
       "bucket name cannot be empty")
-  (is (some? (s3-store "foo-bar-data")))
-  (is (nil? (:prefix (s3-store "foo-bucket" :prefix ""))))
-  (is (nil? (:prefix (s3-store "foo-bucket" :prefix "/"))))
-  (is (= "foo/" (:prefix (s3-store "foo-bucket" :prefix "foo"))))
-  (is (= "bar/" (:prefix (s3-store "foo-bucket" :prefix "bar/")))))
+  (is (some? (s3-block-store "foo-bar-data")))
+  (is (nil? (:prefix (s3-block-store "foo-bucket" :prefix ""))))
+  (is (nil? (:prefix (s3-block-store "foo-bucket" :prefix "/"))))
+  (is (= "foo/" (:prefix (s3-block-store "foo-bucket" :prefix "foo"))))
+  (is (= "bar/" (:prefix (s3-block-store "foo-bucket" :prefix "bar/")))))
 
 
 
@@ -210,7 +210,7 @@
     (if-let [bucket (System/getenv s3-bucket-var)]
       (let [prefix (str *ns* "/" (System/currentTimeMillis))]
         (tests/check-store!
-          #(s3-store bucket :prefix prefix :region :us-west-2)
+          #(s3-block-store bucket :prefix prefix :region :us-west-2)
           :eraser blocks.store.s3/erase!
           :iterations 20))
       (println "No" s3-bucket-var "in environment, skipping integration test!"))
