@@ -20,9 +20,9 @@ Leiningen, add the following dependency to your project definition:
 
 ## Usage
 
-The `blocks.store.s3` namespace provides the `s3-store` constructor. This takes
-a bucket name and should usually include a key prefix. Blocks are stored as the
-hex-encoded multihash under the key prefix.
+The `blocks.store.s3` namespace provides the `s3-block-store` constructor. This
+takes a bucket name and should usually include a key prefix. Blocks are stored
+as the hex-encoded multihash under the key prefix.
 
 With no other arguments, this will use the AWS SDK's
 [default logic](http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html#credentials-default)
@@ -31,10 +31,10 @@ map with `:access-key` and `:secret-key` entries.
 
 ```clojure
 => (require '[blocks.core :as block]
-            '[blocks.store.s3 :refer [s3-store]])
+            '[blocks.store.s3 :refer [s3-block-store]])
 
 ; Create a new block store backed by S3:
-=> (def store (s3-store "my-bucket" :prefix "foo/bar/" :region :us-west-2))
+=> (def store (s3-block-store "my-bucket" :prefix "foo/bar/" :region :us-west-2))
 #'user/store
 
 => store
@@ -54,14 +54,15 @@ map with `:access-key` and `:secret-key` entries.
   :source #whidbey/uri "s3://my-bucket/foo/bar/12200095f66af8572b7cc3e425fa9b3123130eb47095550f0a439e41d68b9d6b0dcd",
   :stored-at #inst "2015-11-13T18:05:14.000-00:00"})
 
-; Fetched blocks are lazy:
+; Getting blocks makes a HEAD request to S3 to fetch object metadata.
 => (block/get store (:id (first *1)))
 #blocks.data.Block
 {:id #data/hash "QmNNULDwCEew2pktA5UAy7qgupHfaXs7sbCi5gvGCKs3nD",
  :size 615}
 
-=> (realized? *1)
-false
+; Returned blocks are lazy; content is not streamed until the block is opened.
+=> @*1
+nil
 ```
 
 ## License
