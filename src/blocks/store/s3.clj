@@ -45,13 +45,12 @@
   if the keyword doesn't match a supported region."
   [region]
   (when region
-    ; TODO: use reflection here?
-    (Region/getRegion
-      (case region
-        :us-west-1 Regions/US_WEST_1
-        :us-west-2 Regions/US_WEST_2
-        (throw (IllegalArgumentException.
-                 (str "No supported region matching " (pr-str region))))))))
+    (if-let [region (->> (.getEnumConstants Regions)
+                         (filter #(= (name region) (.getName ^Regions %)))
+                         (first))]
+      (Region/getRegion ^Regions region)
+      (throw (IllegalArgumentException.
+               (str "No supported region matching " (pr-str region)))))))
 
 
 (defn get-client
@@ -260,6 +259,10 @@
 
 ;; ## Store Construction
 
+(alter-meta! #'->S3BlockStore assoc :private true)
+(alter-meta! #'map->S3BlockStore assoc :private true)
+
+
 (defn- trim-slashes
   "Cleans a string by removing leading and trailing slashes, then leading and
   trailing whitespace. Returns nil if the resulting string is empty."
@@ -292,8 +295,8 @@
                   (pr-str bucket)))))
   (map->S3BlockStore
     (merge
-      (dissoc opts :credentials :region)
-      {:client (get-client (select-keys opts [:credentials :region]))
+      (dissoc opts :credentials)
+      {:client (get-client opts)
        :bucket (str/trim bucket)
        :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))})))
 
@@ -308,8 +311,3 @@
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))
-
-
-;; Remove automatic constructor functions.
-(ns-unmap *ns* '->S3BlockStore)
-(ns-unmap *ns* 'map->S3BlockStore)

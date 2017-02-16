@@ -9,6 +9,11 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ...
 
+## [0.3.1] - 2017-02-15
+
+### Changed
+- Upgrade AWS S3 SDK to 1.11.91.
+
 ## [0.3.0] - 2016-08-14
 
 ### Changed
@@ -35,7 +40,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Initial library release.
 
-[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.0...HEAD
+[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.1...HEAD
+[0.3.1]: https://github.com/greglook/blocks-s3/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/greglook/blocks-s3/compare/0.2.1...0.3.0
 [0.2.1]: https://github.com/greglook/blocks-s3/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/greglook/blocks-s3/compare/0.1.0...0.2.0
