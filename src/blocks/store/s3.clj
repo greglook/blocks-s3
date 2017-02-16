@@ -45,13 +45,12 @@
   if the keyword doesn't match a supported region."
   [region]
   (when region
-    ; TODO: use reflection here?
-    (Region/getRegion
-      (case region
-        :us-west-1 Regions/US_WEST_1
-        :us-west-2 Regions/US_WEST_2
-        (throw (IllegalArgumentException.
-                 (str "No supported region matching " (pr-str region))))))))
+    (if-let [region (->> (.getEnumConstants Regions)
+                         (filter #(= (name region) (.getName ^Regions %)))
+                         (first))]
+      (Region/getRegion ^Regions region)
+      (throw (IllegalArgumentException.
+               (str "No supported region matching " (pr-str region)))))))
 
 
 (defn get-client
@@ -292,8 +291,8 @@
                   (pr-str bucket)))))
   (map->S3BlockStore
     (merge
-      (dissoc opts :credentials :region)
-      {:client (get-client (select-keys opts [:credentials :region]))
+      (dissoc opts :credentials)
+      {:client (get-client opts)
        :bucket (str/trim bucket)
        :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))})))
 
