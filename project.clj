@@ -44,6 +44,5 @@
 
    :coverage
    {:plugins [[lein-cloverage "1.0.9"]]
-    ;:dependencies [[com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.6.6"]]
     :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
