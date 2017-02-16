@@ -259,6 +259,10 @@
 
 ;; ## Store Construction
 
+(alter-meta! #'->S3BlockStore assoc :private true)
+(alter-meta! #'map->S3BlockStore assoc :private true)
+
+
 (defn- trim-slashes
   "Cleans a string by removing leading and trailing slashes, then leading and
   trailing whitespace. Returns nil if the resulting string is empty."
@@ -307,8 +311,3 @@
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))
-
-
-;; Remove automatic constructor functions.
-(ns-unmap *ns* '->S3BlockStore)
-(ns-unmap *ns* 'map->S3BlockStore)
