@@ -27,8 +27,7 @@
   :codox
   {:metadata {:doc/format :markdown}
    :source-uri "https://github.com/greglook/blocks-s3/blob/master/{filepath}#L{line}"
-   :doc-paths ["doc/extra"]
-   :output-path "doc/api"}
+   :output-path "target/doc/api"}
 
   :whidbey
   {:tag-types {'multihash.core.Multihash {'data/hash 'multihash.core/base58}
