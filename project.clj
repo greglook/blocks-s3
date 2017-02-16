@@ -15,7 +15,7 @@
   :dependencies
   [[org.clojure/clojure "1.8.0"]
    [org.clojure/tools.logging "0.3.1"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.20"]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.91"]
    [commons-logging "1.2"]
    [mvxcvi/blocks "0.8.0"]
    [mvxcvi/multihash "2.0.1"]]
@@ -43,7 +43,7 @@
    {:jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
 
    :coverage
-   {:plugins [[rfkm/lein-cloverage "1.0.8"]]
-    :dependencies [[com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.6.6"]]
+   {:plugins [[lein-cloverage "1.0.9"]]
+    ;:dependencies [[com.fasterxml.jackson.dataformat/jackson-dataformat-cbor "2.6.6"]]
     :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
