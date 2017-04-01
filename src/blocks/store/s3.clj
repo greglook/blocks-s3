@@ -5,7 +5,6 @@
       [core :as block]
       [data :as data]
       [store :as store])
-    [blocks.store.util :as util]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [multihash.core :as multihash])
@@ -89,11 +88,11 @@
   [prefix object-key]
   (some->
     object-key
-    (util/check #(.startsWith ^String % (or prefix ""))
+    (store/check #(.startsWith ^String % (or prefix ""))
       (log/warnf "S3 object %s is not under prefix %s"
                  object-key (pr-str prefix)))
     (cond-> prefix (subs (count prefix)))
-    (util/check #(re-matches #"[0-9a-fA-F]+" %)
+    (store/check #(re-matches #"[0-9a-fA-F]+" %)
       (log/warnf "Encountered block subkey with invalid hex: %s"
                  (pr-str value)))
     (multihash/decode)))
@@ -197,7 +196,7 @@
         (.setMaxKeys request (int limit)))
       (->> (list-objects-seq client request)
            (map (partial summary-stats prefix))
-           (util/select-stats opts))))
+           (store/select-stats opts))))
 
 
   (-get
@@ -236,31 +235,30 @@
         (log/debugf "DeleteObject %s" (s3-uri bucket object-key))
         (.deleteObject client bucket object-key)
         true)
-      false)))
+      false))
 
 
-(defn erase!
-  "Clears all blocks from the S3 store by deleting everything in the bucket
-  matching the store prefix."
-  [store]
-  (let [^AmazonS3 client (:client store)
-        request (doto (ListObjectsRequest.)
-                  (.setBucketName (:bucket store))
-                  (.setPrefix (:prefix store)))]
+  store/ErasableStore
+
+  (-erase!
+    [store]
     (log/warnf "Erasing all objects under %s"
                (s3-uri (:bucket store) (:prefix store)))
-    (->> (list-objects-seq client request)
-         (map (fn [^S3ObjectSummary object]
-                (.deleteObject client (:bucket store) (.getKey object))))
-         (dorun))
-    nil))
+    (run!
+      (fn delete
+        [^S3ObjectSummary object]
+        (.deleteObject client (:bucket store) (.getKey object)))
+      (list-objects-seq
+        client
+        (doto (ListObjectsRequest.)
+          (.setBucketName (:bucket store))
+          (.setPrefix (:prefix store)))))))
 
 
 
 ;; ## Store Construction
 
-(alter-meta! #'->S3BlockStore assoc :private true)
-(alter-meta! #'map->S3BlockStore assoc :private true)
+(store/privatize-constructors! S3BlockStore)
 
 
 (defn- trim-slashes
@@ -303,7 +301,7 @@
 
 (defmethod store/initialize "s3"
   [location]
-  (let [uri (util/parse-uri location)]
+  (let [uri (store/parse-uri location)]
     (s3-block-store
       (:host uri)
       :prefix (:path uri)
