@@ -5,9 +5,7 @@
             :url "http://unlicense.org/"}
 
   :aliases
-  {"docs" ["do" ["codox"] ["doc-lit"]]
-   "doc-lit" ["marg" "--dir" "doc/marginalia"]
-   "coverage" ["with-profile" "+test,+coverage" "cloverage"]}
+  {"coverage" ["with-profile" "+coverage" "cloverage"]}
 
   :deploy-branches ["master"]
   :pedantic? :abort
@@ -15,10 +13,10 @@
   :dependencies
   [[org.clojure/clojure "1.8.0"]
    [org.clojure/tools.logging "0.3.1"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.91"]
    [commons-logging "1.2"]
-   [mvxcvi/blocks "0.8.0"]
-   [mvxcvi/multihash "2.0.1"]]
+   [mvxcvi/blocks "0.9.0"]
+   [mvxcvi/multihash "2.0.1"]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.91"]]
 
   :test-selectors
   {:unit (complement :integration)

@@ -211,7 +211,6 @@
       (let [prefix (str *ns* "/" (System/currentTimeMillis))]
         (tests/check-store!
           #(s3-block-store bucket :prefix prefix :region :us-west-2)
-          :eraser blocks.store.s3/erase!
           :iterations 20))
       (println "No" s3-bucket-var "in environment, skipping integration test!"))
     (println "No" access-key-var "in environment, skipping integration test!")))

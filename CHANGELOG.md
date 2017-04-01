@@ -7,7 +7,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-...
+### Changed
+- Upgrade to blocks 0.9.0.
 
 ## [0.3.1] - 2017-02-15
 
