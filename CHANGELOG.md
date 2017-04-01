@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+...
+
+## [0.3.2] - 2017-03-31
+
 ### Changed
 - Upgrade to blocks 0.9.0.
 
@@ -41,7 +45,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Initial library release.
 
-[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.1...HEAD
+[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.2...HEAD
+[0.3.2]: https://github.com/greglook/blocks-s3/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/greglook/blocks-s3/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/greglook/blocks-s3/compare/0.2.1...0.3.0
 [0.2.1]: https://github.com/greglook/blocks-s3/compare/0.2.0...0.2.1
