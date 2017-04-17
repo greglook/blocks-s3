@@ -1,6 +1,8 @@
 blocks-s3
 =========
 
+[![Join the chat at https://gitter.im/greglook/blocks-s3](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/greglook/blocks-s3?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 [![Dependency Status](https://www.versioneye.com/user/projects/5646aca2b5b03d001f00081e/badge.svg?style=flat)](https://www.versioneye.com/user/projects/5646aca2b5b03d001f00081e)
 [![CircleCI](https://circleci.com/gh/greglook/blocks-s3.svg?style=shield&circle-token=2d7ae95392368c6f66dd93ab63420d0498f2b2fc)](https://circleci.com/gh/greglook/blocks-s3)
 [![Coverage Status](https://coveralls.io/repos/greglook/blocks-s3/badge.svg?branch=develop&service=github)](https://coveralls.io/github/greglook/blocks-s3?branch=develop)
