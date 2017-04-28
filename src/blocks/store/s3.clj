@@ -10,7 +10,8 @@
     [multihash.core :as multihash])
   (:import
     (com.amazonaws.auth
-      BasicAWSCredentials)
+      BasicAWSCredentials
+      DefaultAWSCredentialsProviderChain)
     (com.amazonaws.regions
       Region
       Regions)
@@ -62,10 +63,16 @@
   - `:region` a keyword or string designating the region to operate in."
   [opts]
   (let [client (if-let [creds (:credentials opts)]
-                 (AmazonS3Client. (BasicAWSCredentials.
-                                    (:access-key creds)
-                                    (:secret-key creds)))
-                 (AmazonS3Client.))]
+                 (AmazonS3Client.
+                   (BasicAWSCredentials.
+                     (:access-key creds)
+                     (:secret-key creds)))
+                 (AmazonS3Client.
+                   ; This is explicitly specified so that S3 block stores can
+                   ; directly use the global provider instance, rather than the
+                   ; default S3 client behavior which tries to operate in an
+                   ; anonymous mode if no credentials are found.
+                   (DefaultAWSCredentialsProviderChain/getInstance)))]
     (when-let [region (get-region (:region opts))]
       (.setRegion client region))
     client))

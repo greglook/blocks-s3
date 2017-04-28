@@ -1,4 +1,4 @@
-(defproject mvxcvi/blocks-s3 "0.3.2"
+(defproject mvxcvi/blocks-s3 "0.3.3"
   :description "Content-addressable S3 block store."
   :url "https://github.com/greglook/blocks-s3"
   :license {:name "Public Domain"
@@ -16,7 +16,7 @@
    [commons-logging "1.2"]
    [mvxcvi/blocks "0.9.0"]
    [mvxcvi/multihash "2.0.1"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.91"]]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.124"]]
 
   :test-selectors
   {:unit (complement :integration)
