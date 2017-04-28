@@ -7,7 +7,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-...
+### Changed
+- Upgrade S3 SDK to version 1.11.124.
 
 ## [0.3.2] - 2017-03-31
 

@@ -16,7 +16,7 @@
    [commons-logging "1.2"]
    [mvxcvi/blocks "0.9.0"]
    [mvxcvi/multihash "2.0.1"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.91"]]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.124"]]
 
   :test-selectors
   {:unit (complement :integration)
