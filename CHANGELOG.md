@@ -9,6 +9,7 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 - Upgrade S3 SDK to version 1.11.124.
+- Explicitly use default credentials provider chain for S3 client.
 
 ## [0.3.2] - 2017-03-31
 
