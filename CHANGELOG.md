@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+...
+
+## [0.3.3] - 2017-04-28
+
 ### Changed
 - Upgrade S3 SDK to version 1.11.124.
 - Explicitly use default credentials provider chain for S3 client.
@@ -47,7 +51,8 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 Initial library release.
 
-[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.2...HEAD
+[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.3.3...HEAD
+[0.3.3]: https://github.com/greglook/blocks-s3/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/greglook/blocks-s3/compare/0.3.1...0.3.2
 [0.3.1]: https://github.com/greglook/blocks-s3/compare/0.3.0...0.3.1
 [0.3.0]: https://github.com/greglook/blocks-s3/compare/0.2.1...0.3.0
