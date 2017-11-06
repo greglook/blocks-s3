@@ -12,14 +12,13 @@
 
   :dependencies
   [[org.clojure/clojure "1.8.0"]
-   [org.clojure/tools.logging "0.3.1"]
-   [commons-logging "1.2"]
-   [mvxcvi/blocks "0.9.0"]
-   [mvxcvi/multihash "2.0.1"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.124"]]
+   [org.clojure/tools.logging "0.4.0"]
+   [mvxcvi/blocks "1.0.0"]
+   [mvxcvi/multihash "2.0.2"]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.224"]]
 
   :test-selectors
-  {:unit (complement :integration)
+  {:default (complement :integration)
    :integration :integration}
 
   :codox
@@ -32,7 +31,12 @@
                'blocks.data.Block {'blocks.data.Block (partial into {})}}}
 
   :profiles
-  {:repl
+  {:dev
+   {:dependencies
+    [[commons-logging "1.2"]
+     [mvxcvi/test.carly "0.4.1"]]}
+
+   :repl
    {:source-paths ["dev"]
     :dependencies [[org.clojure/tools.namespace "0.2.11"]]}
 

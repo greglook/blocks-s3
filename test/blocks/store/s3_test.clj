@@ -1,9 +1,8 @@
 (ns blocks.store.s3-test
   (:require
     [blocks.core :as block]
-    (blocks.store
-      [s3 :as s3 :refer [s3-block-store]]
-      [tests :as tests])
+    [blocks.store.s3 :as s3 :refer [s3-block-store]]
+    [blocks.store.tests :as tests]
     [clojure.test :refer :all]
     [multihash.core :as multihash])
   (:import
@@ -84,7 +83,7 @@
                      (.setObjectContent (block/open reference)))))
         block (object->block client "blocket" "data/test/"
                              {:id (:id reference), :size (:size reference)})]
-    (is (nil? @block) "should return lazy block")
+    (is (block/lazy? block) "should return lazy block")
     (is (= (:id reference) (:id block)) "returns correct id")
     (is (= (:size reference) (:size block)) "returns correct size")
     (is (empty? @calls) "no calls to S3 on block init")
@@ -205,12 +204,14 @@
 (def s3-bucket-var  "BLOCKS_S3_BUCKET")
 
 
-(deftest ^:integration check-s3-store
+(deftest ^:integration check-behavior
   (if (System/getenv access-key-var)
     (if-let [bucket (System/getenv s3-bucket-var)]
       (let [prefix (str *ns* "/" (System/currentTimeMillis))]
-        (tests/check-store!
-          #(s3-block-store bucket :prefix prefix :region :us-west-2)
-          :iterations 20))
+        (tests/check-store
+          #(doto (s3-block-store bucket
+                   :prefix prefix
+                   :region :us-west-2)
+             (block/erase!!))))
       (println "No" s3-bucket-var "in environment, skipping integration test!"))
     (println "No" access-key-var "in environment, skipping integration test!")))

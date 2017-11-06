@@ -189,7 +189,7 @@
           (metadata-stats id bucket object-key response))
         (catch AmazonS3Exception ex
           ; Check for not-found errors and return nil.
-          (when (not= "NoSuchKey" (.getErrorCode ex))
+          (when (not= 404 (.getStatusCode ex))
             (throw ex))))))
 
 
