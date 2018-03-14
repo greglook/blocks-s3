@@ -177,7 +177,8 @@
   [^AmazonS3 client
    ^String bucket
    ^String prefix
-   ^boolean set-sse-flag?]
+   ^boolean set-sse-flag?
+   ^clojure.lang.IFn mutate-put-metadata-fn]
 
   store/BlockStore
 
@@ -222,11 +223,12 @@
         (object->block client bucket prefix stats)
         ; Otherwise, upload block to S3.
         (let [object-key (id->key prefix (:id block))
-              ; TODO: support function which allows you to mutate the ObjectMetadata before it is sent in the putObject call?
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
           (when set-sse-flag?
             (.setSSEAlgorithm metadata ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION))
+          (when mutate-put-metadata-fn
+            (mutate-put-metadata-fn metadata))
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
           (let [result (with-open [content (block/open block)]
                          (.putObject client bucket object-key content metadata))
@@ -288,6 +290,9 @@
 (defn s3-block-store
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
+  To mutate ObjectMetadata before a block put, assoc `:mutate-put-metadata-fn` in
+  a single arity function that operates on this metadata. Content-Length metadata
+  is already specified.
 
   Supported options:
 
