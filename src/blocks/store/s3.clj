@@ -176,7 +176,8 @@
 (defrecord S3BlockStore
   [^AmazonS3 client
    ^String bucket
-   ^String prefix]
+   ^String prefix
+   ^boolean set-sse-flag?]
 
   store/BlockStore
 
@@ -224,6 +225,8 @@
               ; TODO: support function which allows you to mutate the ObjectMetadata before it is sent in the putObject call?
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
+          (when set-sse-flag?
+            (.setSSEAlgorithm metadata ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION))
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
           (let [result (with-open [content (block/open block)]
                          (.putObject client bucket object-key content metadata))
@@ -291,7 +294,9 @@
   - `:credentials` a map with `:access-key` and `:secret-key` entries providing
     explicit AWS credentials.
   - `:region` a keyword or string designating the region the bucket is in.
-  - `:prefix` a string prefix to store the blocks under."
+  - `:prefix` a string prefix to store the blocks under.
+  - `:set-sse-flag?` a boolean whether to set the Server Side AES256 Encryption
+    flag on PUT."
   [bucket & {:as opts}]
   (when (or (not (string? bucket))
             (empty? (str/trim bucket)))
@@ -303,7 +308,8 @@
       (dissoc opts :credentials)
       {:client (get-client opts)
        :bucket (str/trim bucket)
-       :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))})))
+       :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))
+       :set-sse-flag? (boolean (:set-sse-flag? opts))})))
 
 
 (defmethod store/initialize "s3"
