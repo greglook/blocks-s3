@@ -317,6 +317,13 @@
        :set-sse-flag? (boolean (:set-sse-flag? opts))})))
 
 
+(defn- parse-boolean-query-flag
+  "Presence of flag and empty or true value will return true. Anything else will return false."
+  [query-map k]
+  (boolean
+    (when-let [value (some->> k (get query-map) (str/lower-case))]
+      (or (empty? value) (= "true" value)))))
+
 (defmethod store/initialize "s3"
   [location]
   (let [uri (store/parse-uri location)]
@@ -324,6 +331,7 @@
       (:host uri)
       :prefix (:path uri)
       :region (keyword (get-in uri [:query :region]))
+      :set-sse-flag? (parse-boolean-query-flag (:query uri) :set-sse-flag)
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))

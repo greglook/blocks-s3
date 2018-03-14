@@ -197,6 +197,13 @@
   (is (= "bar/" (:prefix (s3-block-store "foo-bucket" :prefix "bar/")))))
 
 
+(deftest query-flag-parsing
+  (is (not (#'s3/parse-boolean-query-flag {} nil)))
+  (is (not (#'s3/parse-boolean-query-flag {} :a)))
+  (is (#'s3/parse-boolean-query-flag {:a "true"} :a))
+  (is (not (#'s3/parse-boolean-query-flag {:a "false"} :a)))
+  (is (#'s3/parse-boolean-query-flag {:a ""} :a))
+  (is (not (#'s3/parse-boolean-query-flag {:a "true" :b "false"} :b))))
 
 ;; ## Integration Tests
 
