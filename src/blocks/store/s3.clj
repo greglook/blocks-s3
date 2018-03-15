@@ -77,8 +77,10 @@
       (.setRegion client region))
     client))
 
+
 (def ^:private sse-algorithms
   {:aes-256 ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION})
+
 
 (defn select-sse-algorithm
   [algorithm]
@@ -276,7 +278,6 @@
           (.setPrefix (:prefix store)))))))
 
 
-
 ;; ## Store Construction
 
 (store/privatize-constructors! S3BlockStore)
@@ -309,8 +310,8 @@
     explicit AWS credentials.
   - `:region` a keyword or string designating the region the bucket is in.
   - `:prefix` a string prefix to store the blocks under.
-  - `:sse-algorithm` a keyword algorithm selection to set Server Side Encryption
-    on block PUT. No `:sse-algorithm` present will not set this flag."
+  - `:sse` a keyword algorithm selection to set Server Side Encryption
+    on block PUT. No `:sse` present will not set this flag."
   [bucket & {:as opts}]
   (when (or (not (string? bucket))
             (empty? (str/trim bucket)))
@@ -323,7 +324,7 @@
       {:client (get-client opts)
        :bucket (str/trim bucket)
        :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))
-       :sse-algorithm (:sse-algorithm opts)})))
+       :sse (:sse opts)})))
 
 
 (defmethod store/initialize "s3"
@@ -333,8 +334,8 @@
       (:host uri)
       :prefix (:path uri)
       :region (keyword (get-in uri [:query :region]))
-      :sse-algorithm (when-let [algorithm (keyword (get-in uri [:query :sse-algorithm]))]
-                  (select-sse-algorithm algorithm))
+      :sse (when-let [algorithm (keyword (get-in uri [:query :sse]))]
+             (select-sse-algorithm algorithm))
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))
