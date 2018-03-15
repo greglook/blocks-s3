@@ -77,7 +77,16 @@
       (.setRegion client region))
     client))
 
+(def ^:private sse-algorithms
+  {:aes-256 ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION})
 
+(defn select-sse-algorithm
+  [algorithm]
+  (if-let [algorithm' (algorithm sse-algorithms)]
+    algorithm'
+    (throw (ex-info (format "Unsupported SSE algorithm '%s'" algorithm)
+                    {:supported (keys sse-algorithms)
+                     :given algorithm}))))
 
 ;; ## S3 Key Translation
 
@@ -177,7 +186,7 @@
   [^AmazonS3 client
    ^String bucket
    ^String prefix
-   ^boolean set-sse-flag?
+   sse-algorithm
    ^clojure.lang.IFn mutate-put-metadata-fn]
 
   store/BlockStore
@@ -225,8 +234,8 @@
         (let [object-key (id->key prefix (:id block))
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
-          (when set-sse-flag?
-            (.setSSEAlgorithm metadata ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION))
+          (when sse-algorithm
+            (.setSSEAlgorithm metadata sse-algorithm))
           (when mutate-put-metadata-fn
             (mutate-put-metadata-fn metadata))
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
@@ -300,8 +309,8 @@
     explicit AWS credentials.
   - `:region` a keyword or string designating the region the bucket is in.
   - `:prefix` a string prefix to store the blocks under.
-  - `:set-sse-flag?` a boolean whether to set the Server Side AES256 Encryption
-    flag on PUT."
+  - `:sse-algorithm` a keyword algorithm selection to set Server Side Encryption
+    on block PUT. No `:sse-algorithm` present will not set this flag."
   [bucket & {:as opts}]
   (when (or (not (string? bucket))
             (empty? (str/trim bucket)))
@@ -314,15 +323,8 @@
       {:client (get-client opts)
        :bucket (str/trim bucket)
        :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))
-       :set-sse-flag? (boolean (:set-sse-flag? opts))})))
+       :sse-algorithm (:sse-algorithm opts)})))
 
-
-(defn- parse-boolean-query-flag
-  "Presence of flag and empty or true value will return true. Anything else will return false."
-  [query-map k]
-  (boolean
-    (when-let [value (some->> k (get query-map) (str/lower-case))]
-      (or (empty? value) (= "true" value)))))
 
 (defmethod store/initialize "s3"
   [location]
@@ -331,7 +333,8 @@
       (:host uri)
       :prefix (:path uri)
       :region (keyword (get-in uri [:query :region]))
-      :set-sse-flag? (parse-boolean-query-flag (:query uri) :set-sse-flag)
+      :sse-algorithm (when-let [algorithm (keyword (get-in uri [:query :sse-algorithm]))]
+                  (select-sse-algorithm algorithm))
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))

@@ -197,13 +197,15 @@
   (is (= "bar/" (:prefix (s3-block-store "foo-bucket" :prefix "bar/")))))
 
 
-(deftest query-flag-parsing
-  (is (not (#'s3/parse-boolean-query-flag {} nil)))
-  (is (not (#'s3/parse-boolean-query-flag {} :a)))
-  (is (#'s3/parse-boolean-query-flag {:a "true"} :a))
-  (is (not (#'s3/parse-boolean-query-flag {:a "false"} :a)))
-  (is (#'s3/parse-boolean-query-flag {:a ""} :a))
-  (is (not (#'s3/parse-boolean-query-flag {:a "true" :b "false"} :b))))
+(deftest sse-algorithm-selection
+  (is (thrown? Exception
+               (s3/select-sse-algorithm nil)))
+  (is (thrown? Exception
+               (s3/select-sse-algorithm :foo/bar)))
+  (is (= ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION
+         (s3/select-sse-algorithm :aes-256))))
+
+
 
 ;; ## Integration Tests
 
