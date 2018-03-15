@@ -199,11 +199,11 @@
 
 (deftest sse-algorithm-selection
   (is (thrown? Exception
-        (s3/select-sse-algorithm nil)))
+               (#'s3/select-sse-algorithm nil)))
   (is (thrown? Exception
-        (s3/select-sse-algorithm :foo/bar)))
+               (#'s3/select-sse-algorithm :foo/bar)))
   (is (= ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION
-         (s3/select-sse-algorithm :aes-256))))
+         (#'s3/select-sse-algorithm :aes-256))))
 
 
 ;; ## Integration Tests
