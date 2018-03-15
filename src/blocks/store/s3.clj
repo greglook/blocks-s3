@@ -189,7 +189,7 @@
    ^String bucket
    ^String prefix
    sse-algorithm
-   ^clojure.lang.IFn mutate-put-metadata-fn]
+   alter-put-metadata]
 
   store/BlockStore
 
@@ -238,8 +238,8 @@
                          (.setContentLength (:size block)))]
           (when sse-algorithm
             (.setSSEAlgorithm metadata sse-algorithm))
-          (when mutate-put-metadata-fn
-            (mutate-put-metadata-fn metadata))
+          (when alter-put-metadata
+            (alter-put-metadata this metadata))
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
           (let [result (with-open [content (block/open block)]
                          (.putObject client bucket object-key content metadata))
@@ -300,9 +300,7 @@
 (defn s3-block-store
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
-  To mutate ObjectMetadata before a block put, assoc `:mutate-put-metadata-fn` in
-  a single arity function that operates on this metadata. Content-Length metadata
-  is already specified.
+
 
   Supported options:
 
@@ -311,7 +309,10 @@
   - `:region` a keyword or string designating the region the bucket is in.
   - `:prefix` a string prefix to store the blocks under.
   - `:sse` a keyword algorithm selection to set Server Side Encryption
-    on block PUT. No `:sse` present will not set this flag."
+    on block PUT. No `:sse` present will not set this flag.
+  - `:alter-put-metdata` a 2-arity function that operates on the block store
+    record and this metadata. This function is called before a put operation and
+    the return value is discarded. Content-Length metadata is already specified."
   [bucket & {:as opts}]
   (when (or (not (string? bucket))
             (empty? (str/trim bucket)))
@@ -324,7 +325,8 @@
       {:client (get-client opts)
        :bucket (str/trim bucket)
        :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))
-       :sse (:sse opts)})))
+       :sse (:sse opts)
+       :alter-put-metadata (:alter-put-metadata opts)})))
 
 
 (defmethod store/initialize "s3"
