@@ -277,6 +277,7 @@
           (.setPrefix (:prefix store)))))))
 
 
+
 ;; ## Store Construction
 
 (store/privatize-constructors! S3BlockStore)
@@ -300,7 +301,6 @@
   "Creates a new S3 block store. If credentials are not explicitly provided, the
   AWS SDK will use a number of mechanisms to infer them from the environment.
 
-
   Supported options:
 
   - `:credentials` a map with `:access-key` and `:secret-key` entries providing
@@ -323,9 +323,7 @@
       (dissoc opts :credentials)
       {:client (get-client opts)
        :bucket (str/trim bucket)
-       :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))
-       :sse (:sse opts)
-       :alter-put-metadata (:alter-put-metadata opts)})))
+       :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))})))
 
 
 (defmethod store/initialize "s3"
