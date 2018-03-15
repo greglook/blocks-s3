@@ -82,13 +82,12 @@
   {:aes-256 ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION})
 
 
-(defn select-sse-algorithm
+(defn- select-sse-algorithm
+  "Return corresponding SSE algorithm string constant or throw if not supported."
   [algorithm]
-  (if-let [algorithm' (algorithm sse-algorithms)]
-    algorithm'
-    (throw (ex-info (format "Unsupported SSE algorithm '%s'" algorithm)
-                    {:supported (keys sse-algorithms)
-                     :given algorithm}))))
+  (or (get sse-algorithms algorithm)
+      (throw (ex-info (format "Unsupported SSE algorithm '%s'" algorithm)
+                      {:supported (keys sse-algorithms) :given algorithm}))))
 
 ;; ## S3 Key Translation
 
@@ -188,7 +187,7 @@
   [^AmazonS3 client
    ^String bucket
    ^String prefix
-   sse-algorithm
+   sse
    alter-put-metadata]
 
   store/BlockStore
@@ -236,8 +235,8 @@
         (let [object-key (id->key prefix (:id block))
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
-          (when sse-algorithm
-            (.setSSEAlgorithm metadata sse-algorithm))
+          (when sse
+            (.setSSEAlgorithm metadata (select-sse-algorithm sse)))
           (when alter-put-metadata
             (alter-put-metadata this metadata))
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
@@ -337,7 +336,9 @@
       :prefix (:path uri)
       :region (keyword (get-in uri [:query :region]))
       :sse (when-let [algorithm (keyword (get-in uri [:query :sse]))]
-             (select-sse-algorithm algorithm))
+             ;; check if supported, but return keyword
+             (select-sse-algorithm algorithm)
+             algorithm)
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))
