@@ -78,6 +78,16 @@
     client))
 
 
+(def ^:private sse-algorithms
+  {:aes-256 ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION})
+
+
+(defn- select-sse-algorithm
+  "Return corresponding SSE algorithm string constant or throw if not supported."
+  [algorithm]
+  (or (get sse-algorithms algorithm)
+      (throw (ex-info (format "Unsupported SSE algorithm '%s'" algorithm)
+                      {:supported (keys sse-algorithms) :given algorithm}))))
 
 ;; ## S3 Key Translation
 
@@ -176,7 +186,9 @@
 (defrecord S3BlockStore
   [^AmazonS3 client
    ^String bucket
-   ^String prefix]
+   ^String prefix
+   sse
+   alter-put-metadata]
 
   store/BlockStore
 
@@ -221,9 +233,12 @@
         (object->block client bucket prefix stats)
         ; Otherwise, upload block to S3.
         (let [object-key (id->key prefix (:id block))
-              ; TODO: support function which allows you to mutate the ObjectMetadata before it is sent in the putObject call?
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
+          (when sse
+            (.setSSEAlgorithm metadata (select-sse-algorithm sse)))
+          (when alter-put-metadata
+            (alter-put-metadata this metadata))
           (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
           (let [result (with-open [content (block/open block)]
                          (.putObject client bucket object-key content metadata))
@@ -291,7 +306,12 @@
   - `:credentials` a map with `:access-key` and `:secret-key` entries providing
     explicit AWS credentials.
   - `:region` a keyword or string designating the region the bucket is in.
-  - `:prefix` a string prefix to store the blocks under."
+  - `:prefix` a string prefix to store the blocks under.
+  - `:sse` a keyword algorithm selection to set Server Side Encryption
+    on block PUT. No `:sse` present will not set this flag.
+  - `:alter-put-metdata` a 2-arity function that operates on the block store
+    record and this metadata. This function is called before a put operation and
+    the return value is discarded. Content-Length metadata is already specified."
   [bucket & {:as opts}]
   (when (or (not (string? bucket))
             (empty? (str/trim bucket)))
@@ -313,6 +333,10 @@
       (:host uri)
       :prefix (:path uri)
       :region (keyword (get-in uri [:query :region]))
+      :sse (when-let [algorithm (keyword (get-in uri [:query :sse]))]
+             ;; check if supported, but return keyword
+             (select-sse-algorithm algorithm)
+             algorithm)
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
                       :secret-key (:secret creds)}))))

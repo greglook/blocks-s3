@@ -197,6 +197,14 @@
   (is (= "bar/" (:prefix (s3-block-store "foo-bucket" :prefix "bar/")))))
 
 
+(deftest sse-algorithm-selection
+  (is (thrown? Exception
+               (#'s3/select-sse-algorithm nil)))
+  (is (thrown? Exception
+               (#'s3/select-sse-algorithm :foo/bar)))
+  (is (= ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION
+         (#'s3/select-sse-algorithm :aes-256))))
+
 
 ;; ## Integration Tests
 
