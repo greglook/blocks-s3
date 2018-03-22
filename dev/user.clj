@@ -18,5 +18,6 @@
 (def store
   (s3-block-store
     (System/getenv "BLOCKS_S3_BUCKET")
-    :prefix "blocks-s3-repl"
-    :region :us-west-2))
+    :prefix (str (System/getenv "USER") "/blocks-s3-repl")
+    :region :us-west-2
+    :sse :aes-256))
