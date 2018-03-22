@@ -219,7 +219,8 @@
         (tests/check-store
           #(doto (s3-block-store bucket
                    :prefix prefix
-                   :region :us-west-2)
+                   :region :us-west-2
+                   :sse :aes-256)
              (block/erase!!))))
       (println "No" s3-bucket-var "in environment, skipping integration test!"))
     (println "No" access-key-var "in environment, skipping integration test!")))

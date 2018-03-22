@@ -7,7 +7,12 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-...
+### Added
+- S3 Block store supports basic server-side encryption (SSE) by setting the
+  `:sse` attribute to `:aes-256`.
+  [#4](https://github.com/greglook/blocks-s3/pull/4)
+- An arbitrary `alter-put-metadata` function can be provided to mutate block
+  object metadata before it is written.
 
 ## [0.3.3] - 2017-04-28
 
