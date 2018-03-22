@@ -14,6 +14,11 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 - An arbitrary `alter-put-metadata` function can be provided to mutate block
   object metadata before it is written.
 
+### Fixed
+- S3 block content streams will now automatically drain the remaining bytes in
+  the stream when they are closed.
+  [#2](https://github.com/greglook/blocks-s3/issues/2)
+
 ## [0.3.3] - 2017-04-28
 
 ### Changed

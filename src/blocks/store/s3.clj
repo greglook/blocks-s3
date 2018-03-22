@@ -29,7 +29,10 @@
       PutObjectRequest
       PutObjectResult
       S3Object
-      S3ObjectSummary)))
+      S3ObjectSummary)
+    (java.io
+      FilterInputStream
+      InputStream)))
 
 
 ;; ## S3 Utilities
@@ -137,6 +140,27 @@
    :s3/metadata (into {} (.getRawMetadata metadata))})
 
 
+(defn- auto-draining-stream
+  "Wraps an `InputStream` in a proxy which will automatically drain the
+  underlying stream when it is closed."
+  [^InputStream stream]
+  (proxy [FilterInputStream] [stream]
+    (close
+      []
+      ; TODO: be smarter about this; for large remaining payloads it may be
+      ; faster to abort and re-establish the connection than to drain the rest
+      ; of the object.
+      (let [start (System/nanoTime)]
+        (loop [drained 0]
+          (if (pos? (.read stream))
+            (recur (inc drained))
+            (when (pos? drained)
+              (log/debugf "Drained %d bytes in %.2f ms while closing S3 input stream"
+                          drained
+                          (/ (- (System/nanoTime) start) 1e6))))))
+      (.close stream))))
+
+
 (defn- object->block
   "Creates a lazy block to read from the given S3 object."
   [^AmazonS3 client ^String bucket prefix stats]
@@ -147,13 +171,17 @@
         (fn object-reader
           ([]
            (log/debugf "Opening object %s" (s3-uri bucket object-key))
-           (.getObjectContent (.getObject client bucket object-key)))
+           (->> (.getObject client bucket object-key)
+                (.getObjectContent)
+                (auto-draining-stream)))
           ([^long start ^long end]
            (log/debugf "Opening object %s byte range [%d, %d)"
                        (s3-uri bucket object-key) start end)
-           (let [request (doto (GetObjectRequest. bucket object-key)
-                           (.setRange start (dec end)))]
-             (.getObjectContent (.getObject client request)))))))
+           (->> (doto (GetObjectRequest. bucket object-key)
+                  (.setRange start (dec end)))
+                (.getObject client)
+                (.getObjectContent)
+                (auto-draining-stream))))))
     (dissoc stats :id :size)))
 
 
