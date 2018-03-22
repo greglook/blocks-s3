@@ -11,11 +11,11 @@
   :pedantic? :abort
 
   :dependencies
-  [[org.clojure/clojure "1.8.0"]
+  [[org.clojure/clojure "1.9.0"]
    [org.clojure/tools.logging "0.4.0"]
-   [mvxcvi/blocks "1.0.0"]
-   [mvxcvi/multihash "2.0.2"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.224"]]
+   [mvxcvi/blocks "1.1.0"]
+   [mvxcvi/multihash "2.0.3"]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.271"]]
 
   :test-selectors
   {:default (complement :integration)
@@ -45,6 +45,6 @@
 
    :coverage
    {:plugins [[lein-cloverage "1.0.9"]]
-    :dependencies [[riddley "0.1.14"]]
+    :dependencies [[riddley "0.1.15"]]
     :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
