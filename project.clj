@@ -15,7 +15,8 @@
    [org.clojure/tools.logging "0.4.0"]
    [mvxcvi/blocks "1.1.0"]
    [mvxcvi/multihash "2.0.3"]
-   [com.amazonaws/aws-java-sdk-s3 "1.11.271"]]
+   [com.amazonaws/aws-java-sdk-s3 "1.11.271"]
+   [commons-logging "1.2"]]
 
   :test-selectors
   {:default (complement :integration)
@@ -33,8 +34,7 @@
   :profiles
   {:dev
    {:dependencies
-    [[commons-logging "1.2"]
-     [mvxcvi/test.carly "0.4.1"]]}
+    [[mvxcvi/test.carly "0.4.1"]]}
 
    :repl
    {:source-paths ["dev"]
