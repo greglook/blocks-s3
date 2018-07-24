@@ -1,15 +1,15 @@
 (ns blocks.store.s3
   "Block storage backed by a bucket in Amazon S3."
   (:require
-    (blocks
-      [core :as block]
-      [data :as data]
-      [store :as store])
+    [blocks.core :as block]
+    [blocks.data :as data]
+    [blocks.store :as store]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [multihash.core :as multihash])
   (:import
     (com.amazonaws.auth
+      AWSCredentialsProvider
       BasicAWSCredentials
       DefaultAWSCredentialsProviderChain)
     (com.amazonaws.regions
@@ -61,21 +61,27 @@
 
   Supported options:
 
-  - `:credentials` a map with `:access-key` and `:secret-key` entries providing
-    explicit AWS credentials.
-  - `:region` a keyword or string designating the region to operate in."
+  - `:credentials`
+    A map with `:access-key` and `:secret-key` entries providing explicit AWS
+    credentials.
+  - `:credentials-provider`
+    An AWS `CredentialsProvider` instance to fetch authentication materials
+    from. Ignored if `:credentials` are provided directly.
+  - `:region`
+    A keyword or string designating the region to operate in."
   [opts]
-  (let [client (if-let [creds (:credentials opts)]
-                 (AmazonS3Client.
-                   (BasicAWSCredentials.
-                     (:access-key creds)
-                     (:secret-key creds)))
-                 (AmazonS3Client.
+  (let [client (or (when-let [creds (:credentials opts)]
+                     (AmazonS3Client.
+                       (BasicAWSCredentials.
+                         (:access-key creds)
+                         (:secret-key creds))))
+                   (when-let [provider (:credentials-provider opts)]
+                     (AmazonS3Client. ^AWSCredentialsProvider provider))
                    ; This is explicitly specified so that S3 block stores can
                    ; directly use the global provider instance, rather than the
                    ; default S3 client behavior which tries to operate in an
                    ; anonymous mode if no credentials are found.
-                   (DefaultAWSCredentialsProviderChain/getInstance)))]
+                   (AmazonS3Client. (DefaultAWSCredentialsProviderChain/getInstance)))]
     (when-let [region (get-region (:region opts))]
       (.setRegion client region))
     client))
@@ -91,6 +97,8 @@
   (or (get sse-algorithms algorithm)
       (throw (ex-info (format "Unsupported SSE algorithm '%s'" algorithm)
                       {:supported (keys sse-algorithms) :given algorithm}))))
+
+
 
 ;; ## S3 Key Translation
 

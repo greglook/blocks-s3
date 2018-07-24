@@ -7,7 +7,9 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
-...
+### Added
+- Block store accepts a `:credentials-provider` which will be used if an AWS
+  access key and secret are not provided directly.
 
 ## [0.4.0] - 2018-03-22
 
