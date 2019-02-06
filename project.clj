@@ -14,6 +14,7 @@
   [[org.clojure/clojure "1.10.0"]
    [org.clojure/tools.logging "0.4.1"]
    [mvxcvi/blocks "2.0.0-SNAPSHOT"]
+   ; TODO: upgrade to software.amazon.awssdk/s3 v2
    [com.amazonaws/aws-java-sdk-s3 "1.11.491"]]
 
   :test-selectors

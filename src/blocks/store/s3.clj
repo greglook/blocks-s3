@@ -1,23 +1,35 @@
 (ns blocks.store.s3
-  "Block storage backed by a bucket in Amazon S3."
+  "This store provides block storage backed by a bucket in Amazon S3.
+
+  Each block is stored in a separate object in the bucket. Stores may be
+  constructed using the `s3://<bucket-name>/<prefix>` URI form."
   (:require
-    [blocks.core :as block]
     [blocks.data :as data]
     [blocks.store :as store]
+    ;[byte-streams :as bytes]
+    ;[clojure.java.io :as io]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
-    [multihash.core :as multihash])
+    [com.stuartsierra.component :as component]
+    [manifold.deferred :as d]
+    [manifold.stream :as s]
+    [multiformats.base.b16 :as hex]
+    [multiformats.hash :as multihash])
   (:import
     (com.amazonaws.auth
+      AWSCredentials
       AWSCredentialsProvider
+      AWSStaticCredentialsProvider
       BasicAWSCredentials
+      BasicSessionCredentials
       DefaultAWSCredentialsProviderChain)
     (com.amazonaws.regions
       Region
       Regions)
     (com.amazonaws.services.s3
       AmazonS3
-      AmazonS3Client)
+      AmazonS3Client
+      AmazonS3ClientBuilder)
     (com.amazonaws.services.s3.model
       AmazonS3Exception
       Bucket
@@ -32,78 +44,114 @@
       S3ObjectSummary)
     (java.io
       FilterInputStream
-      InputStream)))
+      InputStream)
+    (java.time
+      Instant)))
 
 
 ;; ## S3 Utilities
 
-(defn s3-uri
-  "Constructs a URI referencing an object in S3."
+(defn- s3-uri
+  "Construct a URI referencing an object in S3."
   [bucket object-key]
   (java.net.URI. "s3" bucket (str "/" object-key) nil))
 
 
-(defn get-region
-  "Translates a Clojure keyword into an S3 region instance. Throws an exception
+(defn- aws-region
+  "Translate a Clojure keyword into an S3 region instance. Throws an exception
   if the keyword doesn't match a supported region."
+  ^Regions
   [region]
-  (when region
-    (if-let [region (->> (.getEnumConstants Regions)
-                         (filter #(= (name region) (.getName ^Regions %)))
-                         (first))]
-      (Region/getRegion ^Regions region)
-      (throw (IllegalArgumentException.
-               (str "No supported region matching " (pr-str region)))))))
-
-
-(defn get-client
-  "Constructs an S3 client.
-
-  Supported options:
-
-  - `:credentials`
-    A map with `:access-key` and `:secret-key` entries providing explicit AWS
-    credentials.
-  - `:credentials-provider`
-    An AWS `CredentialsProvider` instance to fetch authentication materials
-    from. Ignored if `:credentials` are provided directly.
-  - `:region`
-    A keyword or string designating the region to operate in."
-  [opts]
-  (let [client (or (when-let [creds (:credentials opts)]
-                     (AmazonS3Client.
-                       (BasicAWSCredentials.
-                         (:access-key creds)
-                         (:secret-key creds))))
-                   (when-let [provider (:credentials-provider opts)]
-                     (AmazonS3Client. ^AWSCredentialsProvider provider))
-                   ; This is explicitly specified so that S3 block stores can
-                   ; directly use the global provider instance, rather than the
-                   ; default S3 client behavior which tries to operate in an
-                   ; anonymous mode if no credentials are found.
-                   (AmazonS3Client. (DefaultAWSCredentialsProviderChain/getInstance)))]
-    (when-let [region (get-region (:region opts))]
-      (.setRegion client region))
-    client))
+  (if-let [region (->> (.getEnumConstants Regions)
+                       (filter #(= (name region) (.getName ^Regions %)))
+                       (first))]
+    (Region/getRegion ^Regions region)
+    (throw (IllegalArgumentException.
+             (str "No supported region matching " (pr-str region))))))
 
 
 (def ^:private sse-algorithms
+  "Map of supported Server Side Encryption algorithm keys."
   {:aes-256 ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION})
 
 
-(defn- select-sse-algorithm
-  "Return corresponding SSE algorithm string constant or throw if not supported."
+(defn- get-sse-algorithm
+  "Look up a supported SSE algorithm string constant or throw if not supported."
   [algorithm]
   (or (get sse-algorithms algorithm)
-      (throw (ex-info (format "Unsupported SSE algorithm '%s'" algorithm)
-                      {:supported (keys sse-algorithms) :given algorithm}))))
+      (throw (ex-info
+               (format "Unsupported SSE algorithm %s" (pr-str algorithm))
+               {:supported (set (keys sse-algorithms))
+                :algorithm algorithm}))))
+
+
+(defn- s3-credentials
+  "Coerce several kinds of credential specs into an `AWSCredentialsProvider`
+  that can be used to build a client."
+  [creds]
+  (cond
+    ; This is explicitly specified so that S3 block stores can use the global
+    ; provider instance, rather than the default S3 client behavior which tries
+    ; to operate in an anonymous mode if no credentials are found.
+    (nil? creds)
+    (DefaultAWSCredentialsProviderChain/getInstance)
+
+    ; Input is already a credential provider.
+    (instance? AWSCredentialsProvider creds)
+    creds
+
+    ; Static credentials.
+    (instance? AWSCredentials creds)
+    (AWSStaticCredentialsProvider. creds)
+
+    ; Static map credentials.
+    (map? creds)
+    (if (:session-token creds)
+      (BasicSessionCredentials.
+        (:access-key creds)
+        (:secret-key creds)
+        (:session-token creds))
+      (BasicAWSCredentials.
+        (:access-key creds)
+        (:secret-key creds)))
+
+    ; Unknown specification.
+    :else
+    (throw (ex-info
+             (str "Unknown credentials value format: " (pr-str creds))
+             {:credentials creds}))))
+
+
+(defn- s3-client
+  "Construct a new S3 client."
+  [credentials region]
+  (->
+    (AmazonS3ClientBuilder/standard)
+    (.withCredentials (s3-credentials credentials))
+    (cond->
+      region
+      (.withRegion (aws-region region)))
+    (.build)))
 
 
 
-;; ## S3 Key Translation
+;; ## S3 Keys
+
+(defn- trim-slashes
+  "Clean a string by removing leading and trailing whitespace and slashes.
+  Returns nil if the resulting string is empty."
+  ^String
+  [path]
+  (when-not (str/blank? path)
+    (let [result (-> (str/trim path)
+                     (str/replace #"^/*" "")
+                     (str/replace #"/*$" ""))]
+      (when-not (str/blank? result)
+        result))))
+
 
 (defn- id->key
-  "Converts a multihash identifier to an S3 object key, potentially applying a
+  "Convert a multihash identifier to an S3 object key, potentially applying a
   common prefix. Multihashes are rendered as hex strings."
   ^String
   [prefix id]
@@ -111,42 +159,47 @@
 
 
 (defn- key->id
-  "Converts an S3 object key into a multihash identifier, potentially stripping
-  out a common prefix. The block subkey must be a valid hex-encoded multihash."
+  "Convert an S3 object key into a multihash identifier, potentially stripping
+  out a common prefix. The prefix must already be slash-trimmed and the block
+  subkey must be a valid hex-encoded multihash."
   [prefix object-key]
-  (some->
-    object-key
-    (store/check #(.startsWith ^String % (or prefix ""))
-      (log/warnf "S3 object %s is not under prefix %s"
-                 object-key (pr-str prefix)))
-    (cond-> prefix (subs (count prefix)))
-    (store/check #(re-matches #"[0-9a-fA-F]+" %)
-      (log/warnf "Encountered block subkey with invalid hex: %s"
-                 (pr-str value)))
-    (multihash/decode)))
+  (let [hex (if (str/blank? prefix)
+              object-key
+              (subs object-key (inc (count prefix))))]
+    (if (re-matches #"[0-9a-fA-F]+" hex)
+      (multihash/decode (hex/parse hex))
+      (log/warnf "Object %s did not form valid hex entry: %s" object-key hex))))
 
 
 
-;; ## S3 Block Functions
+;; ## Stat Metadata
 
 (defn- summary-stats
   "Generates a metadata map from an S3ObjectSummary."
-  [prefix ^S3ObjectSummary object]
-  {:id (key->id prefix (.getKey object))
-   :size (.getSize object)
-   :source (s3-uri (.getBucketName object) (.getKey object))
-   :stored-at (.getLastModified object)})
+  [prefix ^S3ObjectSummary summary]
+  (when-let [id (key->id prefix (.getKey summary))]
+    (with-meta
+      {:id id
+       :size (.getSize summary)
+       :stored-at (Instant/ofEpochMilli (.getTime (.getLastModified summary)))}
+      {::bucket (.getBucketName summary)
+       ::key (.getKey summary)})))
 
 
 (defn- metadata-stats
   "Generates a metadata map from an ObjectMetadata."
   [id bucket object-key ^ObjectMetadata metadata]
-  {:id id
-   :size (.getContentLength metadata)
-   :source (s3-uri bucket object-key)
-   :stored-at (.getLastModified metadata)
-   :s3/metadata (into {} (.getRawMetadata metadata))})
+  (with-meta
+    {:id id
+     :size (.getContentLength metadata)
+     :stored-at (Instant/ofEpochMilli (.getTime (.getLastModified metadata)))}
+    {::bucket bucket
+     ::key object-key
+     ::metadata (into {} (.getRawMetadata metadata))}))
 
+
+
+;; ## Object Content
 
 (defn- auto-draining-stream
   "Wraps an `InputStream` in a proxy which will automatically drain the
@@ -155,42 +208,77 @@
   (proxy [FilterInputStream] [stream]
     (close
       []
-      ; TODO: be smarter about this; for large remaining payloads it may be
-      ; faster to abort and re-establish the connection than to drain the rest
-      ; of the object.
+      ;; TODO: be smarter about this; for large remaining payloads it may be
+      ;; faster to abort and re-establish the connection than to drain the rest
+      ;; of the object.
       (let [start (System/nanoTime)]
         (loop [drained 0]
           (if (pos? (.read stream))
             (recur (inc drained))
             (when (pos? drained)
-              (log/debugf "Drained %d bytes in %.2f ms while closing S3 input stream"
+              (log/tracef "Drained %d bytes in %.2f ms while closing S3 input stream"
                           drained
                           (/ (- (System/nanoTime) start) 1e6))))))
       (.close stream))))
 
 
+(deftype S3ObjectReader
+  [^AmazonS3 client
+   ^String bucket
+   ^String object-key]
+
+  data/ContentReader
+
+  (read-all
+    [this]
+    (log/tracef "Opening object %s" (s3-uri bucket object-key))
+    (->> (.getObject client bucket object-key)
+         (.getObjectContent)
+         (auto-draining-stream)))
+
+
+  (read-range
+    [this start end]
+    (log/tracef "Opening object %s byte range %d - %d"
+                (s3-uri bucket object-key) start end)
+    (->> (doto (GetObjectRequest. bucket object-key)
+           (.setRange start (dec end)))
+         (.getObject client)
+         (.getObjectContent)
+         (auto-draining-stream))))
+
+
+(alter-meta! #'->S3ObjectReader assoc :private true)
+
+
 (defn- object->block
   "Creates a lazy block to read from the given S3 object."
-  [^AmazonS3 client ^String bucket prefix stats]
-  (block/with-stats
-    (data/lazy-block
-      (:id stats) (:size stats)
-      (let [object-key (id->key prefix (:id stats))]
-        (fn object-reader
-          ([]
-           (log/debugf "Opening object %s" (s3-uri bucket object-key))
-           (->> (.getObject client bucket object-key)
-                (.getObjectContent)
-                (auto-draining-stream)))
-          ([^long start ^long end]
-           (log/debugf "Opening object %s byte range [%d, %d)"
-                       (s3-uri bucket object-key) start end)
-           (->> (doto (GetObjectRequest. bucket object-key)
-                  (.setRange start (dec end)))
-                (.getObject client)
-                (.getObjectContent)
-                (auto-draining-stream))))))
-    (dissoc stats :id :size)))
+  [client stats]
+  (with-meta
+    (data/create-block
+      (:id stats)
+      (:size stats)
+      (:stored-at stats)
+      (->S3ObjectReader
+        client
+        (::bucket (meta stats))
+        (::key (meta stats))))
+    (meta stats)))
+
+
+(defn- get-object-stats
+  "Look up a block object in S3. Returns the stats map if it exists, otherwise
+  nil."
+  [^AmazonS3 client bucket prefix id]
+  (let [object-key (id->key prefix id)]
+    (try
+      (log/tracef "GetObjectMetadata %s" (s3-uri bucket object-key))
+      (let [response (.getObjectMetadata client bucket object-key)]
+        (metadata-stats id bucket object-key response))
+      (catch AmazonS3Exception ex
+        ; Check for not-found errors and return nil.
+        (when (not= 404 (.getStatusCode ex))
+          (throw ex))))))
 
 
 (defn- list-objects-seq
@@ -198,7 +286,7 @@
   specified number of object summaries."
   [^AmazonS3 client ^ListObjectsRequest request]
   (lazy-seq
-    (log/debugf "ListObjects in %s after %s limit %s"
+    (log/tracef "ListObjects in %s after %s limit %s"
                 (s3-uri (.getBucketName request) (.getPrefix request))
                 (pr-str (.getMarker request))
                 (pr-str (.getMaxKeys request)))
@@ -213,104 +301,135 @@
                                (pos? new-limit)))
                   (let [next-batch (ListNextBatchOfObjectsRequest. listing)
                         new-request (doto (.toListObjectsRequest next-batch)
-                                      (.setMaxKeys (and new-limit
-                                                        (int new-limit))))]
+                                      (.setMaxKeys (and new-limit (int new-limit))))]
                     (list-objects-seq client new-request))))))))
 
+
+(defn- list-objects
+  "Friendlier wrapper around `list-objects-seq` which accepts a map of query
+  options."
+  [client bucket prefix query]
+  (let [request (doto (ListObjectsRequest.)
+                  (.setBucketName bucket)
+                  (.setPrefix prefix)
+                  (.setMarker (str prefix (:after query))))]
+    (when-let [limit (:limit query)]
+      (.setMaxKeys request (int limit)))
+    (list-objects-seq client request)))
+
+
+
+;; ## S3 Store
 
 ;; Block records are stored in a bucket in S3, under some key prefix.
 (defrecord S3BlockStore
   [^AmazonS3 client
    ^String bucket
    ^String prefix
+   credentials
+   region
    sse
    alter-put-metadata]
 
+  component/Lifecycle
+
+  (start
+    [this]
+    (if client
+      this
+      (assoc this :client (s3-client credentials region))))
+
+
+  (stop
+    [this]
+    ; TODO: close client?
+    (assoc this :client nil))
+
+
   store/BlockStore
-
-  (-stat
-    [this id]
-    (let [object-key (id->key prefix id)]
-      (try
-        (log/debugf "GetObjectMetadata %s" (s3-uri bucket object-key))
-        (let [response (.getObjectMetadata client bucket object-key)]
-          (metadata-stats id bucket object-key response))
-        (catch AmazonS3Exception ex
-          ; Check for not-found errors and return nil.
-          (when (not= 404 (.getStatusCode ex))
-            (throw ex))))))
-
 
   (-list
     [this opts]
-    (let [request (doto (ListObjectsRequest.)
-                    (.setBucketName bucket)
-                    (.setPrefix prefix)
-                    (.setMarker (str prefix (:after opts))))]
-      (when-let [limit (:limit opts)]
-        (.setMaxKeys request (int limit)))
-      (->> (list-objects-seq client request)
-           (map (partial summary-stats prefix))
-           (store/select-stats opts))))
+    (let [out (s/stream 1000)]
+      (store/future'
+        (try
+          (loop [objects (->> (select-keys opts [:after :limit])
+                              (list-objects client bucket prefix)
+                              (keep (partial summary-stats prefix)))]
+            (when-let [stats (first objects)]
+              ; Check that the id is still before the marker, if set.
+              (when (or (nil? (:before opts))
+                        (pos? (compare (:before opts) (multihash/hex (:id stats)))))
+                ; Process next block; recur if accepted by the stream.
+                (when @(s/put! out (object->block client stats))
+                  (recur (next objects))))))
+          (catch Exception ex
+            (log/error ex "Failure listing S3 blocks")
+            (s/put! out ex))
+          (finally
+            (s/close! out))))
+      (s/source-only out)))
+
+
+  (-stat
+    [this id]
+    (store/future'
+      (get-object-stats client bucket prefix id)))
 
 
   (-get
     [this id]
-    (when-let [stats (.-stat this id)]
-      (object->block client bucket prefix stats)))
+    (store/future'
+      (when-let [stats (get-object-stats client bucket prefix id)]
+        (object->block client stats))))
 
 
   (-put!
     [this block]
-    (data/merge-blocks
-      block
-      (if-let [stats (.-stat this (:id block))]
-        ; Block already exists, return lazy block.
-        (object->block client bucket prefix stats)
-        ; Otherwise, upload block to S3.
+    (store/future'
+      (if-let [stats (get-object-stats client bucket prefix (:id block))]
+        ; Block already stored, return it.
+        (object->block client stats)
+        ; Upload block to S3.
         (let [object-key (id->key prefix (:id block))
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
           (when sse
-            (.setSSEAlgorithm metadata (select-sse-algorithm sse)))
+            (.setSSEAlgorithm metadata (get-sse-algorithm sse)))
           (when alter-put-metadata
             (alter-put-metadata this metadata))
-          (log/debugf "PutObject %s to %s" block (s3-uri bucket object-key))
-          (let [result (with-open [content (block/open block)]
+          (log/tracef "PutObject %s to %s" block (s3-uri bucket object-key))
+          (let [result (with-open [content (data/content-stream block nil nil)]
                          (.putObject client bucket object-key content metadata))
-                stats (metadata-stats (:id block) bucket object-key
-                                      (.getMetadata ^PutObjectResult result))]
-            (object->block client bucket prefix
-                           (assoc stats
-                                  :size (:size block)
-                                  :stored-at (java.util.Date.))))))))
+                ; TODO: make sure this has :size and :stored-at
+                stats (metadata-stats
+                        (:id block) bucket object-key
+                        (.getMetadata ^PutObjectResult result))]
+            (object->block client stats))))))
 
 
   (-delete!
     [this id]
-    (if (.-stat this id)
-      (let [object-key (id->key prefix id)]
-        (log/debugf "DeleteObject %s" (s3-uri bucket object-key))
-        (.deleteObject client bucket object-key)
-        true)
-      false))
+    (store/future'
+      (if (get-object-stats client bucket prefix id)
+        (let [object-key (id->key prefix id)]
+          (log/tracef "DeleteObject %s" (s3-uri bucket object-key))
+          (.deleteObject client bucket object-key)
+          true)
+        false)))
 
 
   store/ErasableStore
 
   (-erase!
-    [store]
-    (log/warnf "Erasing all objects under %s"
-               (s3-uri (:bucket store) (:prefix store)))
+    [this]
+    (log/infof "Erasing all objects under %s"
+               (s3-uri bucket prefix))
     (run!
-      (fn delete
+      (fn delete-object
         [^S3ObjectSummary object]
-        (.deleteObject client (:bucket store) (.getKey object)))
-      (list-objects-seq
-        client
-        (doto (ListObjectsRequest.)
-          (.setBucketName (:bucket store))
-          (.setPrefix (:prefix store)))))))
+        (.deleteObject client bucket (.getKey object)))
+      (list-objects client bucket prefix {}))))
 
 
 
@@ -319,47 +438,42 @@
 (store/privatize-constructors! S3BlockStore)
 
 
-(defn- trim-slashes
-  "Cleans a string by removing leading and trailing slashes, then leading and
-  trailing whitespace. Returns nil if the resulting string is empty."
-  ^String
-  [string]
-  (when-not (empty? string)
-    (let [result (-> string
-                     (str/replace #"^/*" "")
-                     (str/replace #"/*$" "")
-                     (str/trim))]
-      (when-not (empty? result)
-        result))))
-
-
 (defn s3-block-store
-  "Creates a new S3 block store. If credentials are not explicitly provided, the
-  AWS SDK will use a number of mechanisms to infer them from the environment.
+  "Creates a new S3 block store. If credentials are not provided, the AWS SDK
+  will use a number of mechanisms to infer them from the environment.
 
   Supported options:
 
-  - `:credentials` a map with `:access-key` and `:secret-key` entries providing
-    explicit AWS credentials.
-  - `:region` a keyword or string designating the region the bucket is in.
-  - `:prefix` a string prefix to store the blocks under.
-  - `:sse` a keyword algorithm selection to set Server Side Encryption
-    on block PUT. No `:sse` present will not set this flag.
-  - `:alter-put-metdata` a 2-arity function that operates on the block store
-    record and this metadata. This function is called before a put operation and
-    the return value is discarded. Content-Length metadata is already specified."
+  - `:credentials`
+    Authentication credentials to use for the store. There are several
+    possibilities:
+      - An `AWSCredentialsProvider` to draw credentials from dynamically.
+      - A static `AWSCredentials` object to use directly.
+      - A map with `:access-key`, `:secret-key`, and optionally
+        `:session-token` entries.
+  - `:region`
+    A keyword or string designating the region the bucket is in.
+    (like `:us-west-2`)
+  - `:prefix`
+    A string prefix to store the blocks under. A trailing slash is always
+    added if not present.
+  - `:sse`
+    A keyword algorithm selection to use Server Side Encryption when storing
+    blocks.
+  - `:alter-put-metadata`
+    A 2-arity function that will be called with the block store and a block's
+    `ObjectMetadata` before it is written. This function may make any desired
+    modifications on the metadata, such as custom encryption schemes, attaching
+    extra headers, and so on."
   [bucket & {:as opts}]
-  (when (or (not (string? bucket))
-            (empty? (str/trim bucket)))
+  (when (or (not (string? bucket)) (str/blank? bucket))
     (throw (IllegalArgumentException.
              (str "Bucket name must be a non-empty string, got: "
                   (pr-str bucket)))))
   (map->S3BlockStore
-    (merge
-      (dissoc opts :credentials)
-      {:client (get-client opts)
-       :bucket (str/trim bucket)
-       :prefix (some-> (trim-slashes (:prefix opts)) (str "/"))})))
+    (assoc opts
+           :bucket (str/trim bucket)
+           :prefix (some-> (trim-slashes (:prefix opts)) (str "/")))))
 
 
 (defmethod store/initialize "s3"
@@ -371,7 +485,7 @@
       :region (keyword (get-in uri [:query :region]))
       :sse (when-let [algorithm (keyword (get-in uri [:query :sse]))]
              ;; check if supported, but return keyword
-             (select-sse-algorithm algorithm)
+             (get-sse-algorithm algorithm)
              algorithm)
       :credentials (when-let [creds (:user-info uri)]
                      {:access-key (:id creds)
