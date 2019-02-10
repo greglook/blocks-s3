@@ -162,9 +162,7 @@
   out a common prefix. The prefix must already be slash-trimmed and the block
   subkey must be a valid hex-encoded multihash."
   [prefix object-key]
-  (let [hex (if (str/blank? prefix)
-              object-key
-              (subs object-key (count prefix)))]
+  (let [hex (subs object-key (count prefix))]
     (if (re-matches #"[0-9a-fA-F]+" hex)
       (multihash/decode (hex/parse hex))
       (log/warnf "Object %s did not form valid hex entry: %s" object-key hex))))
@@ -196,7 +194,13 @@
                   (Instant/now))}
     {::bucket bucket
      ::key object-key
-     ::metadata (into {} (.getRawMetadata metadata))}))
+     ::metadata (into {}
+                      (remove
+                        (comp #{"Accept-Ranges"
+                                "Content-Length"
+                                "Last-Modified"}
+                              key))
+                      (.getRawMetadata metadata))}))
 
 
 
@@ -476,7 +480,9 @@
   (map->S3BlockStore
     (assoc opts
            :bucket (str/trim bucket)
-           :prefix (some-> (trim-slashes (:prefix opts)) (str "/")))))
+           :prefix (some-> (:prefix opts)
+                           (trim-slashes)
+                           (str "/")))))
 
 
 (defmethod store/initialize "s3"
