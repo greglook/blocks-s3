@@ -62,12 +62,11 @@
   if the keyword doesn't match a supported region."
   ^Regions
   [region]
-  (if-let [region (->> (.getEnumConstants Regions)
-                       (filter #(= (name region) (.getName ^Regions %)))
-                       (first))]
-    (Region/getRegion ^Regions region)
-    (throw (IllegalArgumentException.
-             (str "No supported region matching " (pr-str region))))))
+  (or (->> (.getEnumConstants Regions)
+           (filter #(= (name region) (.getName ^Regions %)))
+           (first))
+      (throw (IllegalArgumentException.
+               (str "No supported region matching " (pr-str region))))))
 
 
 (def ^:private sse-algorithms
@@ -165,7 +164,7 @@
   [prefix object-key]
   (let [hex (if (str/blank? prefix)
               object-key
-              (subs object-key (inc (count prefix))))]
+              (subs object-key (count prefix)))]
     (if (re-matches #"[0-9a-fA-F]+" hex)
       (multihash/decode (hex/parse hex))
       (log/warnf "Object %s did not form valid hex entry: %s" object-key hex))))
@@ -192,7 +191,9 @@
   (with-meta
     {:id id
      :size (.getContentLength metadata)
-     :stored-at (Instant/ofEpochMilli (.getTime (.getLastModified metadata)))}
+     :stored-at (if-let [last-modified (.getLastModified metadata)]
+                  (Instant/ofEpochMilli (.getTime last-modified))
+                  (Instant/now))}
     {::bucket bucket
      ::key object-key
      ::metadata (into {} (.getRawMetadata metadata))}))
@@ -401,10 +402,10 @@
           (log/tracef "PutObject %s to %s" block (s3-uri bucket object-key))
           (let [result (with-open [content (data/content-stream block nil nil)]
                          (.putObject client bucket object-key content metadata))
-                ; TODO: make sure this has :size and :stored-at
-                stats (metadata-stats
-                        (:id block) bucket object-key
-                        (.getMetadata ^PutObjectResult result))]
+                stats (assoc (metadata-stats
+                               (:id block) bucket object-key
+                               (.getMetadata ^PutObjectResult result))
+                             :size (:size block))]
             (object->block client stats))))))
 
 
@@ -423,13 +424,15 @@
 
   (-erase!
     [this]
-    (log/infof "Erasing all objects under %s"
-               (s3-uri bucket prefix))
-    (run!
-      (fn delete-object
-        [^S3ObjectSummary object]
-        (.deleteObject client bucket (.getKey object)))
-      (list-objects client bucket prefix {}))))
+    (store/future'
+      (log/infof "Erasing all objects under %s"
+                 (s3-uri bucket prefix))
+      (run!
+        (fn delete-object
+          [^S3ObjectSummary object]
+          (.deleteObject client bucket (.getKey object)))
+        (list-objects client bucket prefix {}))
+      true)))
 
 
 

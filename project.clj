@@ -32,18 +32,19 @@
 
   :profiles
   {:dev
-   {:dependencies [[mvxcvi/blocks-test "2.0.0-SNAPSHOT"]
-                   [commons-logging "1.2"]]}
+   {:dependencies
+    [[mvxcvi/blocks-test "2.0.0-SNAPSHOT"]
+     [commons-logging "1.2"]]}
 
    :repl
    {:source-paths ["dev"]
-    :dependencies [[org.clojure/tools.namespace "0.2.11"]]}
+    :dependencies
+    [[org.clojure/tools.namespace "0.2.11"]]}
 
    :test
    {:jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
 
    :coverage
    {:plugins [[lein-cloverage "1.0.13"]]
-    ;:dependencies [[riddley "0.1.15"]]
     :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
                "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})

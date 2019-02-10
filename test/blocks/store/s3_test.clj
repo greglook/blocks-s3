@@ -4,7 +4,8 @@
     [blocks.store.s3 :as s3 :refer [s3-block-store]]
     [blocks.store.tests :as tests]
     [clojure.test :refer :all]
-    [multihash.core :as multihash])
+    [com.stuartsierra.component :as component]
+    [multiformats.hash :as multihash])
   (:import
     (com.amazonaws.services.s3
       AmazonS3)
@@ -206,6 +207,7 @@
          (#'s3/select-sse-algorithm :aes-256))))
 
 
+
 ;; ## Integration Tests
 
 (def access-key-var "AWS_ACCESS_KEY_ID")
@@ -217,10 +219,13 @@
     (if-let [bucket (System/getenv s3-bucket-var)]
       (let [prefix (str *ns* "/" (System/currentTimeMillis))]
         (tests/check-store
-          #(doto (s3-block-store bucket
-                   :prefix prefix
-                   :region :us-west-2
-                   :sse :aes-256)
-             (block/erase!!))))
+          #(let [store (component/start
+                         (s3-block-store
+                           bucket
+                           :prefix prefix
+                           :region :us-west-2
+                           :sse :aes-256))]
+             @(block/erase! store)
+             store)))
       (println "No" s3-bucket-var "in environment, skipping integration test!"))
     (println "No" access-key-var "in environment, skipping integration test!")))
