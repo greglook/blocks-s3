@@ -13,7 +13,7 @@
   :dependencies
   [[org.clojure/clojure "1.10.0"]
    [org.clojure/tools.logging "0.4.1"]
-   [mvxcvi/blocks "2.0.0-SNAPSHOT"]
+   [mvxcvi/blocks "2.0.0"]
    ; TODO: upgrade to software.amazon.awssdk/s3 v2
    [com.amazonaws/aws-java-sdk-s3 "1.11.491"]]
 
@@ -28,12 +28,15 @@
 
   :whidbey
   {:tag-types {'multiformats.hash.Multihash {'multi/hash 'multiformats.hash/hex}
-               'blocks.data.Block {'blocks.data.Block (juxt :id :size :stored-at)}}}
+               'blocks.data.Block {'blocks.data.Block
+                                   #(array-map :id (:id %)
+                                               :size (:size %)
+                                               :stored-at (:stored-at %))}}}
 
   :profiles
   {:dev
    {:dependencies
-    [[mvxcvi/blocks-test "2.0.0-SNAPSHOT"]
+    [[mvxcvi/blocks-tests "2.0.0"]
      [commons-logging "1.2"]]}
 
    :repl

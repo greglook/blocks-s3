@@ -1,13 +1,11 @@
 (ns blocks.store.s3
-  "This store provides block storage backed by a bucket in Amazon S3.
+  "S3 stores provide block storage backed by a bucket in Amazon S3.
 
   Each block is stored in a separate object in the bucket. Stores may be
-  constructed using the `s3://<bucket-name>/<prefix>` URI form."
+  constructed using an `s3://<bucket-name>/<prefix>` URI."
   (:require
     [blocks.data :as data]
     [blocks.store :as store]
-    ;[byte-streams :as bytes]
-    ;[clojure.java.io :as io]
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [com.stuartsierra.component :as component]
@@ -75,11 +73,12 @@
 
 
 (defn- get-sse-algorithm
-  "Look up a supported SSE algorithm string constant or throw if not supported."
+  "Look up a supported SSE algorithm string constant or throw an exception if
+  not supported."
   [algorithm]
   (or (get sse-algorithms algorithm)
       (throw (ex-info
-               (format "Unsupported SSE algorithm %s" (pr-str algorithm))
+               (str "Unsupported SSE algorithm " (pr-str algorithm))
                {:supported (set (keys sse-algorithms))
                 :algorithm algorithm}))))
 
@@ -89,21 +88,21 @@
   that can be used to build a client."
   [creds]
   (cond
-    ; This is explicitly specified so that S3 block stores can use the global
-    ; provider instance, rather than the default S3 client behavior which tries
-    ; to operate in an anonymous mode if no credentials are found.
+    ;; This is explicitly specified so that S3 block stores can use the global
+    ;; provider instance, rather than the default S3 client behavior which tries
+    ;; to operate in an anonymous mode if no credentials are found.
     (nil? creds)
     (DefaultAWSCredentialsProviderChain/getInstance)
 
-    ; Input is already a credential provider.
+    ;; Input is already a credential provider.
     (instance? AWSCredentialsProvider creds)
     creds
 
-    ; Static credentials.
+    ;; Static credentials.
     (instance? AWSCredentials creds)
     (AWSStaticCredentialsProvider. creds)
 
-    ; Static map credentials.
+    ;; Static map credentials.
     (map? creds)
     (if (:session-token creds)
       (BasicSessionCredentials.
@@ -114,7 +113,7 @@
         (:access-key creds)
         (:secret-key creds)))
 
-    ; Unknown specification.
+    ;; Unknown specification.
     :else
     (throw (ex-info
              (str "Unknown credentials value format: " (pr-str creds))
@@ -259,16 +258,17 @@
 (defn- object->block
   "Creates a lazy block to read from the given S3 object."
   [client stats]
-  (with-meta
-    (data/create-block
-      (:id stats)
-      (:size stats)
-      (:stored-at stats)
-      (->S3ObjectReader
-        client
-        (::bucket (meta stats))
-        (::key (meta stats))))
-    (meta stats)))
+  (let [stat-meta (meta stats)]
+    (with-meta
+      (data/create-block
+        (:id stats)
+        (:size stats)
+        (:stored-at stats)
+        (->S3ObjectReader
+          client
+          (::bucket stat-meta)
+          (::key stat-meta)))
+      stat-meta)))
 
 
 (defn- get-object-stats
@@ -281,7 +281,7 @@
       (let [response (.getObjectMetadata client bucket object-key)]
         (metadata-stats id bucket object-key response))
       (catch AmazonS3Exception ex
-        ; Check for not-found errors and return nil.
+        ;; Check for not-found errors and return nil.
         (when (not= 404 (.getStatusCode ex))
           (throw ex))))))
 
@@ -347,7 +347,7 @@
 
   (stop
     [this]
-    ; TODO: close client?
+    ;; TODO: close client?
     (assoc this :client nil))
 
 
@@ -362,10 +362,10 @@
                               (list-objects client bucket prefix)
                               (keep (partial summary-stats prefix)))]
             (when-let [stats (first objects)]
-              ; Check that the id is still before the marker, if set.
+              ;; Check that the id is still before the marker, if set.
               (when (or (nil? (:before opts))
                         (pos? (compare (:before opts) (multihash/hex (:id stats)))))
-                ; Process next block; recur if accepted by the stream.
+                ;; Process next block; recur if accepted by the stream.
                 (when @(s/put! out (object->block client stats))
                   (recur (next objects))))))
           (catch Exception ex
@@ -393,9 +393,9 @@
     [this block]
     (store/future'
       (if-let [stats (get-object-stats client bucket prefix (:id block))]
-        ; Block already stored, return it.
+        ;; Block already stored, return it.
         (object->block client stats)
-        ; Upload block to S3.
+        ;; Upload block to S3.
         (let [object-key (id->key prefix (:id block))
               metadata (doto (ObjectMetadata.)
                          (.setContentLength (:size block)))]
@@ -466,9 +466,9 @@
     added if not present.
   - `:sse`
     A keyword algorithm selection to use Server Side Encryption when storing
-    blocks.
+    blocks. Currently only `:aes-256` is supported.
   - `:alter-put-metadata`
-    A 2-arity function that will be called with the block store and a block's
+    A 2-arg function that will be called with the block store and a block's
     `ObjectMetadata` before it is written. This function may make any desired
     modifications on the metadata, such as custom encryption schemes, attaching
     extra headers, and so on."
@@ -493,7 +493,7 @@
       :prefix (:path uri)
       :region (keyword (get-in uri [:query :region]))
       :sse (when-let [algorithm (keyword (get-in uri [:query :sse]))]
-             ;; check if supported, but return keyword
+             ;; Check if the algorithm is supported.
              (get-sse-algorithm algorithm)
              algorithm)
       :credentials (when-let [creds (:user-info uri)]
