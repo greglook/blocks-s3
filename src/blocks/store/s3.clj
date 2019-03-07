@@ -286,41 +286,42 @@
           (throw ex))))))
 
 
-(defn- list-objects-seq
-  "Produces a lazy sequence which calls S3 ListObjects API for up to the
-  specified number of object summaries."
-  [^AmazonS3 client ^ListObjectsRequest request]
-  (lazy-seq
-    (log/tracef "ListObjects in %s after %s limit %s"
-                (s3-uri (.getBucketName request) (.getPrefix request))
-                (pr-str (.getMarker request))
-                (pr-str (.getMaxKeys request)))
+(defn- run-objects!
+  "Run the provided function over all objects in S3 matching the given query. The loop
+  will terminate if the function returns false or nil."
+  [^AmazonS3 client bucket prefix query f]
+  (loop [request (doto (ListObjectsRequest.)
+                   (.setBucketName bucket)
+                   (.setPrefix prefix)
+                   (.setMarker (str prefix (:after query)))
+                   (.setMaxKeys (and (:limit query) (int (:limit query)))))]
+    (log/tracef "ListObjects in %s after %s"
+                (s3-uri bucket prefix)
+                (pr-str (.getMarker request)))
     (let [limit (.getMaxKeys request)
           listing (.listObjects client request)
-          summaries (seq (.getObjectSummaries listing))
+          summaries (.getObjectSummaries listing)
           new-limit (and limit (- limit (count summaries)))]
-      (when summaries
-        (concat summaries
-                (when (and (.isTruncated listing)
-                           (or (nil? new-limit)
-                               (pos? new-limit)))
-                  (let [next-batch (ListNextBatchOfObjectsRequest. listing)
-                        new-request (doto (.toListObjectsRequest next-batch)
-                                      (.setMaxKeys (and new-limit (int new-limit))))]
-                    (list-objects-seq client new-request))))))))
-
-
-(defn- list-objects
-  "Friendlier wrapper around `list-objects-seq` which accepts a map of query
-  options."
-  [client bucket prefix query]
-  (let [request (doto (ListObjectsRequest.)
-                  (.setBucketName bucket)
-                  (.setPrefix prefix)
-                  (.setMarker (str prefix (:after query))))]
-    (when-let [limit (:limit query)]
-      (.setMaxKeys request (int limit)))
-    (list-objects-seq client request)))
+      (and
+        ;; Check whether there are more summaries to process.
+        (seq summaries)
+        ;; Run f on each object summary while it keeps returning true.
+        (loop [summaries summaries]
+          (if-let [summary (first summaries)]
+            (let [hex (subs (.getKey ^S3ObjectSummary summary) (count prefix))]
+              (when (and (or (nil? (:before query))
+                             (pos? (compare (:before query) hex)))
+                         (f summary))
+                (recur (next summaries))))
+            true))
+        ;; Determine whether there are more objects to list.
+        (and (.isTruncated listing)
+             (or (nil? new-limit)
+                 (pos? new-limit)))
+        ;; Generate the next list request and recur.
+        (let [next-batch (ListNextBatchOfObjectsRequest. listing)]
+          (recur (doto (.toListObjectsRequest next-batch)
+                   (.setMaxKeys (and new-limit (int new-limit))))))))))
 
 
 
@@ -358,16 +359,15 @@
     (let [out (s/stream 1000)]
       (store/future'
         (try
-          (loop [objects (->> (select-keys opts [:after :limit])
-                              (list-objects client bucket prefix)
-                              (keep (partial summary-stats prefix)))]
-            (when-let [stats (first objects)]
-              ;; Check that the id is still before the marker, if set.
-              (when (or (nil? (:before opts))
-                        (pos? (compare (:before opts) (multihash/hex (:id stats)))))
-                ;; Process next block; recur if accepted by the stream.
-                (when @(s/put! out (object->block client stats))
-                  (recur (next objects))))))
+          (run-objects!
+            client bucket prefix opts
+            (fn stream-block
+              [^S3ObjectSummary object]
+              (if-let [stats (summary-stats prefix object)]
+                ;; Publish block to stream.
+                @(s/put! out (object->block client stats))
+                ;; Doesn't look like a block object - ignore and continue.
+                true)))
           (catch Exception ex
             (log/error ex "Failure listing S3 blocks")
             (s/put! out ex))
@@ -431,11 +431,12 @@
     (store/future'
       (log/infof "Erasing all objects under %s"
                  (s3-uri bucket prefix))
-      (run!
-        (fn delete-object
+      (run-objects!
+        client bucket prefix nil
+        (fn delete-object!
           [^S3ObjectSummary object]
-          (.deleteObject client bucket (.getKey object)))
-        (list-objects client bucket prefix {}))
+          (.deleteObject client bucket (.getKey object))
+          true))
       true)))
 
 
