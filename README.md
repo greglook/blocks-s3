@@ -7,7 +7,9 @@ blocks-s3
 [![marginalia docs](https://img.shields.io/badge/doc-marginalia-blue.svg)](https://greglook.github.io/blocks-s3/marginalia/uberdoc.html)
 
 This library implements a [content-addressable](https://en.wikipedia.org/wiki/Content-addressable_storage)
-[block store](//github.com/greglook/blocks) backed by a bucket in Amazon S3.
+[block store](//github.com/greglook/blocks) backed by a bucket in
+[Amazon S3](https://aws.amazon.com/s3/).
+
 
 ## Installation
 
@@ -16,52 +18,73 @@ Leiningen, add the following dependency to your project definition:
 
 [![Clojars Project](http://clojars.org/mvxcvi/blocks-s3/latest-version.svg)](http://clojars.org/mvxcvi/blocks-s3)
 
+
 ## Usage
 
-The `blocks.store.s3` namespace provides the `s3-block-store` constructor. This
-takes a bucket name and should usually include a key prefix. Blocks are stored
-as the hex-encoded multihash under the key prefix.
+The `blocks.store.s3` namespace provides the `s3-block-store` constructor, or
+you can use the `s3://<bucket>/<prefix>` URI syntax with `block/->store`.
+Stores are constructed with a bucket name and should usually include a key
+prefix. Each block is stored as a separate object, keyed by the hex-encoded
+multihash under the store's prefix.
 
 With no other arguments, this will use the AWS SDK's
 [default logic](http://docs.aws.amazon.com/AWSSdkDocsJava/latest/DeveloperGuide/credentials.html#credentials-default)
-to find credentials. Otherwise, they can be provided by passing a `:credentials`
-map with `:access-key` and `:secret-key` entries.
+to find credentials. Otherwise, they can be provided by passing the store a
+`:credentials` value - this can be a custom credentials provider, a static set
+of credentials, or a map with at least an `:access-key` and `:secret-key`
+entries.
 
 ```clojure
 => (require '[blocks.core :as block]
-            '[blocks.store.s3 :refer [s3-block-store]])
+            '[blocks.store.s3 :refer [s3-block-store]]
+            '[com.stuartsierra.component :as component])
 
 ; Create a new block store backed by S3:
-=> (def store (s3-block-store "my-bucket" :prefix "foo/bar/" :region :us-west-2))
-#'user/store
+=> (def store
+     (component/start
+       (s3-block-store "my-bucket"
+                       :prefix "foo/bar/"
+                       :region :us-west-2
+                       :sse :aes-256)))
 
 => store
 #blocks.store.s3.S3BlockStore
 {:bucket "my-bucket",
  :client #<com.amazonaws.services.s3.AmazonS3Client@27107ade>,
- :prefix "foo/bar/"}
+ :prefix "foo/bar/",
+ :region :us-west-2,
+ :sse :aes-256}
 
-; Listing blocks returns a lazy sequence:
-=> (block/list store :limit 2)
-({:id #data/hash "QmNNULDwCEew2pktA5UAy7qgupHfaXs7sbCi5gvGCKs3nD",
-  :size 615,
-  :source #whidbey/uri "s3://my-bucket/foo/bar/122000776d9007f2bcd00fb13c149ea1ed005e83bb00bcdaf6e17900194af8004e96",
-  :stored-at #inst "2015-11-13T18:05:47.000-00:00"}
- {:id #data/hash "QmNNwLWaPCS7HUodgHPz9zoAsExd4xeuRv9SGWRkYamoQG",
-  :size 94,
-  :source #whidbey/uri "s3://my-bucket/foo/bar/12200095f66af8572b7cc3e425fa9b3123130eb47095550f0a439e41d68b9d6b0dcd",
-  :stored-at #inst "2015-11-13T18:05:14.000-00:00"})
+; Files can be stored as blocks:
+=> (def readme @(block/store! store (io/file "README.md")))
+
+; Returned blocks have S3 storage metadata:
+=> (meta readme)
+#:blocks.store.s3
+{:bucket "my-bucket",
+ :key "foo/bar/1220a57d35a4d1b0405b275644fe9f18766a8e662cb56ed48d232a71153a78d81424",
+ :metadata {"ETag" "6aa4f9b538ca79110dfdfeeed92da7f2",
+            "x-amz-server-side-encryption" "AES256"}}
+
+; Listing blocks finds objects in the bucket:
+=> (block/list-seq store :limit 5)
+(#blocks.data.Block
+ {:id #multi/hash "1220a57d35a4d1b0405b275644fe9f18766a8e662cb56ed48d232a71153a78d81424",
+  :size 3152,
+  :stored-at #inst "2019-03-11T21:30:24Z"})
 
 ; Getting blocks makes a HEAD request to S3 to fetch object metadata.
-=> (block/get store (:id (first *1)))
+=> @(block/get store (:id readme))
 #blocks.data.Block
-{:id #data/hash "QmNNULDwCEew2pktA5UAy7qgupHfaXs7sbCi5gvGCKs3nD",
- :size 615}
+{:id #multi/hash "1220a57d35a4d1b0405b275644fe9f18766a8e662cb56ed48d232a71153a78d81424",
+ :size 3152,
+ :stored-at #inst "2019-03-11T21:30:24Z"}
 
 ; Returned blocks are lazy; content is not streamed until the block is opened.
 => (block/lazy? *1)
 true
 ```
+
 
 ## License
 
