@@ -16,6 +16,7 @@ in `[mvxcvi/blocks 2.0.0]`.
 
 ### Changed
 - Upgrade Clojure to 1.10.0
+- Upgrade to new async storage interfaces.
 
 ## [0.4.0] - 2018-03-22
 
