@@ -104,14 +104,15 @@
 
     ;; Static map credentials.
     (map? creds)
-    (if (:session-token creds)
-      (BasicSessionCredentials.
-        (:access-key creds)
-        (:secret-key creds)
-        (:session-token creds))
-      (BasicAWSCredentials.
-        (:access-key creds)
-        (:secret-key creds)))
+    (AWSStaticCredentialsProvider.
+      (if (:session-token creds)
+        (BasicSessionCredentials.
+          (:access-key creds)
+          (:secret-key creds)
+          (:session-token creds))
+        (BasicAWSCredentials.
+          (:access-key creds)
+          (:secret-key creds))))
 
     ;; Unknown specification.
     :else
