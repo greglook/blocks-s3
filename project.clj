@@ -13,8 +13,7 @@
   :dependencies
   [[org.clojure/clojure "1.10.0"]
    [org.clojure/tools.logging "0.4.1"]
-   [mvxcvi/blocks "2.0.0"]
-   [mvxcvi/multiformats "0.2.0"]
+   [mvxcvi/blocks "2.0.1"]
    ; TODO: upgrade to software.amazon.awssdk/s3 v2
    [com.amazonaws/aws-java-sdk-s3 "1.11.491"]]
 
@@ -37,7 +36,7 @@
   :profiles
   {:dev
    {:dependencies
-    [[mvxcvi/blocks-tests "2.0.0"]
+    [[mvxcvi/blocks-tests "2.0.1"]
      [commons-logging "1.2"]]}
 
    :repl
