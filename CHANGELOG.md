@@ -7,6 +7,10 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+...
+
+## [2.0.0] - 2019-03-11
+
 This is a **breaking release** that upgrades to the new asynchronous interfaces
 in `[mvxcvi/blocks 2.0.0]`.
 
@@ -79,7 +83,8 @@ in `[mvxcvi/blocks 2.0.0]`.
 
 Initial library release.
 
-[Unreleased]: https://github.com/greglook/blocks-s3/compare/0.4.0...HEAD
+[Unreleased]: https://github.com/greglook/blocks-s3/compare/2.0.0...HEAD
+[2.0.0]: https://github.com/greglook/blocks-s3/compare/0.4.0...2.0.0
 [0.4.0]: https://github.com/greglook/blocks-s3/compare/0.3.3...0.4.0
 [0.3.3]: https://github.com/greglook/blocks-s3/compare/0.3.2...0.3.3
 [0.3.2]: https://github.com/greglook/blocks-s3/compare/0.3.1...0.3.2
