@@ -1,4 +1,4 @@
-(defproject mvxcvi/blocks-s3 "2.0.0-SNAPSHOT"
+(defproject mvxcvi/blocks-s3 "2.0.1-SNAPSHOT"
   :description "Content-addressable S3 block store."
   :url "https://github.com/greglook/blocks-s3"
   :license {:name "Public Domain"
