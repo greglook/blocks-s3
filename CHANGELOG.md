@@ -7,9 +7,15 @@ This project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 
+This is a **breaking release** that upgrades to the new asynchronous interfaces
+in `[mvxcvi/blocks 2.0.0]`.
+
 ### Added
 - Block store accepts a `:credentials-provider` which will be used if an AWS
   access key and secret are not provided directly.
+
+### Changed
+- Upgrade Clojure to 1.10.0
 
 ## [0.4.0] - 2018-03-22
 
