@@ -11,7 +11,6 @@
     [com.stuartsierra.component :as component]
     [manifold.deferred :as d]
     [manifold.stream :as s]
-    [multiformats.base.b16 :as hex]
     [multiformats.hash :as multihash])
   (:import
     (com.amazonaws.auth
@@ -49,24 +48,6 @@
 
 ;; ## S3 Utilities
 
-(defn- s3-uri
-  "Construct a URI referencing an object in S3."
-  [bucket object-key]
-  (java.net.URI. "s3" bucket (str "/" object-key) nil))
-
-
-(defn- aws-region
-  "Translate a Clojure keyword into an S3 region instance. Throws an exception
-  if the keyword doesn't match a supported region."
-  ^Regions
-  [region]
-  (or (->> (.getEnumConstants Regions)
-           (filter #(= (name region) (.getName ^Regions %)))
-           (first))
-      (throw (IllegalArgumentException.
-               (str "No supported region matching " (pr-str region))))))
-
-
 (def ^:private sse-algorithms
   "Map of supported Server Side Encryption algorithm keys."
   {:aes-256 ObjectMetadata/AES_256_SERVER_SIDE_ENCRYPTION})
@@ -83,9 +64,39 @@
                 :algorithm algorithm}))))
 
 
-(defn- s3-credentials
+(defn- aws-region
+  "Translate a Clojure keyword into an S3 region instance. Throws an exception
+  if the keyword doesn't match a supported region."
+  ^Regions
+  [region]
+  (or (->> (.getEnumConstants Regions)
+           (filter #(= (name region) (.getName ^Regions %)))
+           (first))
+      (throw (ex-info
+               (str "No supported region matching " (pr-str region))
+               {:region region}))))
+
+
+(defn- map->credentials
+  "Coerce a map into an AWS credential object. The map must have at least an
+  `:access-key` and a `:secret-key` string, and may also have `:session-token`
+  for ephemeral session credentials."
+  ^AWSCredentials
+  [creds]
+  (let [{:keys [access-key secret-key session-token]} creds]
+    (when (or (str/blank? access-key) (str/blank? secret-key))
+      (throw (ex-info
+               "Credentials map did not provide both an access-key and secret-key"
+               {:credentials creds})))
+    (if session-token
+      (BasicSessionCredentials. access-key secret-key session-token)
+      (BasicAWSCredentials. access-key secret-key))))
+
+
+(defn- credentials-provider
   "Coerce several kinds of credential specs into an `AWSCredentialsProvider`
   that can be used to build a client."
+  ^AWSCredentialsProvider
   [creds]
   (cond
     ;; This is explicitly specified so that S3 block stores can use the global
@@ -104,29 +115,22 @@
 
     ;; Static map credentials.
     (map? creds)
-    (AWSStaticCredentialsProvider.
-      (if (:session-token creds)
-        (BasicSessionCredentials.
-          (:access-key creds)
-          (:secret-key creds)
-          (:session-token creds))
-        (BasicAWSCredentials.
-          (:access-key creds)
-          (:secret-key creds))))
+    (AWSStaticCredentialsProvider. (map->credentials creds))
 
     ;; Unknown specification.
     :else
     (throw (ex-info
-             (str "Unknown credentials value format: " (pr-str creds))
+             (str "Unknown credentials value type: " (class creds))
              {:credentials creds}))))
 
 
 (defn- s3-client
   "Construct a new S3 client."
+  ^AmazonS3
   [credentials region]
   (->
     (AmazonS3ClientBuilder/standard)
-    (.withCredentials (s3-credentials credentials))
+    (.withCredentials (credentials-provider credentials))
     (cond->
       region
       (.withRegion (aws-region region)))
@@ -135,6 +139,12 @@
 
 
 ;; ## S3 Keys
+
+(defn- s3-uri
+  "Construct a URI referencing an object in S3."
+  [bucket object-key]
+  (java.net.URI. "s3" bucket (str "/" object-key) nil))
+
 
 (defn- trim-slashes
   "Clean a string by removing leading and trailing whitespace and slashes.
@@ -164,7 +174,7 @@
   [prefix object-key]
   (let [hex (subs object-key (count prefix))]
     (if (re-matches #"[0-9a-fA-F]+" hex)
-      (multihash/decode (hex/parse hex))
+      (multihash/parse hex)
       (log/warnf "Object %s did not form valid hex entry: %s" object-key hex))))
 
 
@@ -172,7 +182,7 @@
 ;; ## Stat Metadata
 
 (defn- summary-stats
-  "Generates a metadata map from an S3ObjectSummary."
+  "Generate a metadata map from an S3ObjectSummary."
   [prefix ^S3ObjectSummary summary]
   (when-let [id (key->id prefix (.getKey summary))]
     (with-meta
@@ -184,7 +194,7 @@
 
 
 (defn- metadata-stats
-  "Generates a metadata map from an ObjectMetadata."
+  "Generate a metadata map from an ObjectMetadata."
   [id bucket object-key ^ObjectMetadata metadata]
   (with-meta
     {:id id
@@ -430,8 +440,7 @@
   (-erase!
     [this]
     (store/future'
-      (log/infof "Erasing all objects under %s"
-                 (s3-uri bucket prefix))
+      (log/tracef "Erasing all objects under %s" (s3-uri bucket prefix))
       (run-objects!
         client bucket prefix nil
         (fn delete-object!
@@ -476,9 +485,9 @@
     extra headers, and so on."
   [bucket & {:as opts}]
   (when (or (not (string? bucket)) (str/blank? bucket))
-    (throw (IllegalArgumentException.
-             (str "Bucket name must be a non-empty string, got: "
-                  (pr-str bucket)))))
+    (throw (ex-info
+             (str "Bucket name must be a non-empty string: " (pr-str bucket))
+             {:bucket bucket})))
   (map->S3BlockStore
     (assoc opts
            :bucket (str/trim bucket)
