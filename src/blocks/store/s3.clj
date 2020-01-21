@@ -220,7 +220,9 @@
   "Wraps an `InputStream` in a proxy which will automatically drain the
   underlying stream when it is closed."
   [^InputStream stream]
-  (proxy [FilterInputStream] [stream]
+  (proxy [FilterInputStream]
+         [stream]
+
     (close
       []
       ;; TODO: be smarter about this; for large remaining payloads it may be
@@ -250,7 +252,6 @@
     (->> (.getObject client bucket object-key)
          (.getObjectContent)
          (auto-draining-stream)))
-
 
   (read-range
     [this start end]
@@ -356,7 +357,6 @@
       this
       (assoc this :client (s3-client credentials region))))
 
-
   (stop
     [this]
     ;; TODO: close client?
@@ -386,19 +386,16 @@
             (s/close! out))))
       (s/source-only out)))
 
-
   (-stat
     [this id]
     (store/future'
       (get-object-stats client bucket prefix id)))
-
 
   (-get
     [this id]
     (store/future'
       (when-let [stats (get-object-stats client bucket prefix id)]
         (object->block client stats))))
-
 
   (-put!
     [this block]
@@ -422,7 +419,6 @@
                                (.getMetadata ^PutObjectResult result))
                              :size (:size block))]
             (object->block client stats))))))
-
 
   (-delete!
     [this id]

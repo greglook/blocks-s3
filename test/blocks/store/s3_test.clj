@@ -55,17 +55,17 @@
           (#'s3/credentials-provider {:access-key "key"})))
     (testing "basic"
       (let [provider (#'s3/credentials-provider
-                       {:access-key "key"
-                        :secret-key "secret"})]
+                      {:access-key "key"
+                       :secret-key "secret"})]
         (is (instance? AWSCredentialsProvider provider))
         (let [creds (.getCredentials provider)]
           (is (= "key" (.getAWSAccessKeyId creds)))
           (is (= "secret" (.getAWSSecretKey creds))))))
     (testing "session"
       (let [provider (#'s3/credentials-provider
-                       {:access-key "key"
-                        :secret-key "secret"
-                        :session-token "session"})]
+                      {:access-key "key"
+                       :secret-key "secret"
+                       :session-token "session"})]
         (is (instance? AWSCredentialsProvider provider))
         (let [creds (.getCredentials provider)]
           (is (= "key" (.getAWSAccessKeyId creds)))
@@ -119,19 +119,19 @@
         date (java.util.Date. (.toEpochMilli instant))]
     (testing "summary-stats"
       (is (nil? (#'s3/summary-stats
-                  "foo/bar/"
-                  (doto (S3ObjectSummary.)
-                    (.setBucketName "test-bucket")
-                    (.setKey "foo/bar/abcxyz")
-                    (.setSize 32)
-                    (.setLastModified date)))))
+                 "foo/bar/"
+                 (doto (S3ObjectSummary.)
+                   (.setBucketName "test-bucket")
+                   (.setKey "foo/bar/abcxyz")
+                   (.setSize 32)
+                   (.setLastModified date)))))
       (let [stats (#'s3/summary-stats
-                    "foo/bar/"
-                    (doto (S3ObjectSummary.)
-                      (.setBucketName "test-bucket")
-                      (.setKey "foo/bar/11040123abcd")
-                      (.setSize 45)
-                      (.setLastModified date)))]
+                   "foo/bar/"
+                   (doto (S3ObjectSummary.)
+                     (.setBucketName "test-bucket")
+                     (.setKey "foo/bar/11040123abcd")
+                     (.setSize 45)
+                     (.setLastModified date)))]
         (is (= {:id mhash
                 :size 45
                 :stored-at instant}
@@ -141,12 +141,12 @@
                (meta stats)))))
     (testing "metadata-stats"
       (let [stats (#'s3/metadata-stats
-                    mhash
-                    "test-bucket"
-                    "foo/bar/11040123abcd"
-                    (doto (ObjectMetadata.)
-                      (.setContentLength 45)
-                      (.setLastModified date)))]
+                   mhash
+                   "test-bucket"
+                   "foo/bar/11040123abcd"
+                   (doto (ObjectMetadata.)
+                     (.setContentLength 45)
+                     (.setLastModified date)))]
         (is (= {:id mhash
                 :size 45
                 :stored-at instant}
