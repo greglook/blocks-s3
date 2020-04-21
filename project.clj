@@ -21,11 +21,6 @@
   {:default (complement :integration)
    :integration :integration}
 
-  :codox
-  {:metadata {:doc/format :markdown}
-   :source-uri "https://github.com/greglook/blocks-s3/blob/master/{filepath}#L{line}"
-   :output-path "target/doc/api"}
-
   :whidbey
   {:tag-types {'multiformats.hash.Multihash {'multi/hash 'multiformats.hash/hex}
                'blocks.data.Block {'blocks.data.Block
