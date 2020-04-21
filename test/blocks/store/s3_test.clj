@@ -1,9 +1,10 @@
 (ns blocks.store.s3-test
   (:require
     [blocks.core :as block]
+    [blocks.store :as store]
     [blocks.store.s3 :as s3 :refer [s3-block-store]]
     [blocks.store.tests :as tests]
-    [clojure.test :refer :all]
+    [clojure.test :refer [deftest testing is]]
     [com.stuartsierra.component :as component]
     [multiformats.hash :as multihash])
   (:import
@@ -13,10 +14,7 @@
     (com.amazonaws.services.s3
       AmazonS3)
     (com.amazonaws.services.s3.model
-      ListObjectsRequest
-      ObjectListing
       ObjectMetadata
-      S3Object
       S3ObjectSummary)
     java.net.URI))
 
@@ -173,7 +171,7 @@
   (is (thrown-with-msg? Exception #"Bucket name must be a non-empty string"
         (s3-block-store "   "))
       "bucket name cannot be empty")
-  (is (satisfies? blocks.store/BlockStore (s3-block-store "foo-bar-data")))
+  (is (satisfies? store/BlockStore (s3-block-store "foo-bar-data")))
   (is (nil? (:prefix (s3-block-store "foo-bucket" :prefix ""))))
   (is (nil? (:prefix (s3-block-store "foo-bucket" :prefix "/"))))
   (is (= "foo/" (:prefix (s3-block-store "foo-bucket" :prefix "foo"))))
