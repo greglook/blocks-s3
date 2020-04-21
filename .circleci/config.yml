@@ -45,6 +45,8 @@ jobs:
 
   test:
     executor: clojure
+    environment:
+      AWS_REGION: us-west-2
     steps:
       - checkout
       - restore_cache:
@@ -61,6 +63,8 @@ jobs:
 
   coverage:
     executor: clojure
+    environment:
+      AWS_REGION: us-west-2
     steps:
       - checkout
       - restore_cache:
