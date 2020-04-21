@@ -253,6 +253,7 @@
          (.getObjectContent)
          (auto-draining-stream)))
 
+
   (read-range
     [this start end]
     (log/tracef "Opening object %s byte range %d - %d"
@@ -357,6 +358,7 @@
       this
       (assoc this :client (s3-client credentials region))))
 
+
   (stop
     [this]
     ;; TODO: close client?
@@ -386,16 +388,19 @@
             (s/close! out))))
       (s/source-only out)))
 
+
   (-stat
     [this id]
     (store/future'
       (get-object-stats client bucket prefix id)))
+
 
   (-get
     [this id]
     (store/future'
       (when-let [stats (get-object-stats client bucket prefix id)]
         (object->block client stats))))
+
 
   (-put!
     [this block]
@@ -419,6 +424,7 @@
                                (.getMetadata ^PutObjectResult result))
                              :size (:size block))]
             (object->block client stats))))))
+
 
   (-delete!
     [this id]
