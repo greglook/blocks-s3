@@ -14,8 +14,13 @@
   [[org.clojure/clojure "1.10.1"]
    [org.clojure/tools.logging "1.0.0"]
    [mvxcvi/blocks "2.0.4"]
-   ;; TODO: upgrade to software.amazon.awssdk/s3 v2
-   [com.amazonaws/aws-java-sdk-s3 "1.11.765"]]
+   ;; TODO: investigate alternate SDK options:
+   ;; [software.amazon.awssdk/s3 "..."]
+   ;; https://github.com/cognitect-labs/aws-api
+   [com.amazonaws/aws-java-sdk-s3 "1.11.769"]]
+
+  :managed-dependencies
+  [[commons-logging "1.2"]]
 
   :test-selectors
   {:default (complement :integration)
@@ -32,18 +37,18 @@
   {:dev
    {:dependencies
     [[mvxcvi/blocks-tests "2.0.4"]
-     [commons-logging "1.2"]]}
+     [org.slf4j/slf4j-simple "1.7.30"]]}
 
    :repl
    {:source-paths ["dev"]
     :dependencies
-    [[org.clojure/tools.namespace "1.0.0"]]}
+    [[org.clojure/tools.namespace "1.0.0"]]
+    :jvm-opts ["-Dorg.slf4j.simpleLogger.defaultLogLevel=info"]}
 
    :test
-   {:jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
+   {:jvm-opts ["-Dorg.slf4j.simpleLogger.defaultLogLevel=fatal"]}
 
    :coverage
    {:pedantic? false
     :plugins [[lein-cloverage "1.1.2"]]
-    :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
-               "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
+    :jvm-opts ["-Dorg.slf4j.simpleLogger.defaultLogLevel=debug"]}})
