@@ -9,7 +9,6 @@
     [clojure.string :as str]
     [clojure.tools.logging :as log]
     [com.stuartsierra.component :as component]
-    [manifold.deferred :as d]
     [manifold.stream :as s]
     [multiformats.hash :as multihash])
   (:import
@@ -21,23 +20,17 @@
       BasicSessionCredentials
       DefaultAWSCredentialsProviderChain)
     (com.amazonaws.regions
-      Region
       Regions)
     (com.amazonaws.services.s3
       AmazonS3
-      AmazonS3Client
       AmazonS3ClientBuilder)
     (com.amazonaws.services.s3.model
       AmazonS3Exception
-      Bucket
       GetObjectRequest
       ListNextBatchOfObjectsRequest
       ListObjectsRequest
-      ObjectListing
       ObjectMetadata
-      PutObjectRequest
       PutObjectResult
-      S3Object
       S3ObjectSummary)
     (java.io
       FilterInputStream
@@ -220,7 +213,9 @@
   "Wraps an `InputStream` in a proxy which will automatically drain the
   underlying stream when it is closed."
   [^InputStream stream]
-  (proxy [FilterInputStream] [stream]
+  (proxy [FilterInputStream]
+         [stream]
+
     (close
       []
       ;; TODO: be smarter about this; for large remaining payloads it may be

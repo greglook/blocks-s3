@@ -2,9 +2,8 @@ blocks-s3
 =========
 
 [![CircleCI](https://circleci.com/gh/greglook/blocks-s3.svg?style=shield&circle-token=2d7ae95392368c6f66dd93ab63420d0498f2b2fc)](https://circleci.com/gh/greglook/blocks-s3)
-[![codecov](https://codecov.io/gh/greglook/blocks-s3/branch/develop/graph/badge.svg)](https://codecov.io/gh/greglook/blocks-s3)
-[![API codox](https://img.shields.io/badge/doc-API-blue.svg)](https://greglook.github.io/blocks-s3/api/)
-[![marginalia docs](https://img.shields.io/badge/doc-marginalia-blue.svg)](https://greglook.github.io/blocks-s3/marginalia/uberdoc.html)
+[![codecov](https://codecov.io/gh/greglook/blocks-s3/branch/master/graph/badge.svg)](https://codecov.io/gh/greglook/blocks-s3)
+[![cljdoc lib](https://img.shields.io/badge/cljdoc-lib-blue.svg)](https://cljdoc.org/d/mvxcvi/blocks-s3/)
 
 This library implements a [content-addressable](https://en.wikipedia.org/wiki/Content-addressable_storage)
 [block store](//github.com/greglook/blocks) backed by a bucket in

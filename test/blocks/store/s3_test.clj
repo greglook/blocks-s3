@@ -1,9 +1,10 @@
 (ns blocks.store.s3-test
   (:require
     [blocks.core :as block]
+    [blocks.store :as store]
     [blocks.store.s3 :as s3 :refer [s3-block-store]]
     [blocks.store.tests :as tests]
-    [clojure.test :refer :all]
+    [clojure.test :refer [deftest testing is]]
     [com.stuartsierra.component :as component]
     [multiformats.hash :as multihash])
   (:import
@@ -13,10 +14,7 @@
     (com.amazonaws.services.s3
       AmazonS3)
     (com.amazonaws.services.s3.model
-      ListObjectsRequest
-      ObjectListing
       ObjectMetadata
-      S3Object
       S3ObjectSummary)
     java.net.URI))
 
@@ -55,17 +53,17 @@
           (#'s3/credentials-provider {:access-key "key"})))
     (testing "basic"
       (let [provider (#'s3/credentials-provider
-                       {:access-key "key"
-                        :secret-key "secret"})]
+                      {:access-key "key"
+                       :secret-key "secret"})]
         (is (instance? AWSCredentialsProvider provider))
         (let [creds (.getCredentials provider)]
           (is (= "key" (.getAWSAccessKeyId creds)))
           (is (= "secret" (.getAWSSecretKey creds))))))
     (testing "session"
       (let [provider (#'s3/credentials-provider
-                       {:access-key "key"
-                        :secret-key "secret"
-                        :session-token "session"})]
+                      {:access-key "key"
+                       :secret-key "secret"
+                       :session-token "session"})]
         (is (instance? AWSCredentialsProvider provider))
         (let [creds (.getCredentials provider)]
           (is (= "key" (.getAWSAccessKeyId creds)))
@@ -119,19 +117,19 @@
         date (java.util.Date. (.toEpochMilli instant))]
     (testing "summary-stats"
       (is (nil? (#'s3/summary-stats
-                  "foo/bar/"
-                  (doto (S3ObjectSummary.)
-                    (.setBucketName "test-bucket")
-                    (.setKey "foo/bar/abcxyz")
-                    (.setSize 32)
-                    (.setLastModified date)))))
+                 "foo/bar/"
+                 (doto (S3ObjectSummary.)
+                   (.setBucketName "test-bucket")
+                   (.setKey "foo/bar/abcxyz")
+                   (.setSize 32)
+                   (.setLastModified date)))))
       (let [stats (#'s3/summary-stats
-                    "foo/bar/"
-                    (doto (S3ObjectSummary.)
-                      (.setBucketName "test-bucket")
-                      (.setKey "foo/bar/11040123abcd")
-                      (.setSize 45)
-                      (.setLastModified date)))]
+                   "foo/bar/"
+                   (doto (S3ObjectSummary.)
+                     (.setBucketName "test-bucket")
+                     (.setKey "foo/bar/11040123abcd")
+                     (.setSize 45)
+                     (.setLastModified date)))]
         (is (= {:id mhash
                 :size 45
                 :stored-at instant}
@@ -141,12 +139,12 @@
                (meta stats)))))
     (testing "metadata-stats"
       (let [stats (#'s3/metadata-stats
-                    mhash
-                    "test-bucket"
-                    "foo/bar/11040123abcd"
-                    (doto (ObjectMetadata.)
-                      (.setContentLength 45)
-                      (.setLastModified date)))]
+                   mhash
+                   "test-bucket"
+                   "foo/bar/11040123abcd"
+                   (doto (ObjectMetadata.)
+                     (.setContentLength 45)
+                     (.setLastModified date)))]
         (is (= {:id mhash
                 :size 45
                 :stored-at instant}
@@ -173,7 +171,7 @@
   (is (thrown-with-msg? Exception #"Bucket name must be a non-empty string"
         (s3-block-store "   "))
       "bucket name cannot be empty")
-  (is (satisfies? blocks.store/BlockStore (s3-block-store "foo-bar-data")))
+  (is (satisfies? store/BlockStore (s3-block-store "foo-bar-data")))
   (is (nil? (:prefix (s3-block-store "foo-bucket" :prefix ""))))
   (is (nil? (:prefix (s3-block-store "foo-bucket" :prefix "/"))))
   (is (= "foo/" (:prefix (s3-block-store "foo-bucket" :prefix "foo"))))

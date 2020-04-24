@@ -1,4 +1,4 @@
-(defproject mvxcvi/blocks-s3 "2.0.0"
+(defproject mvxcvi/blocks-s3 "2.0.1-SNAPSHOT"
   :description "Content-addressable S3 block store."
   :url "https://github.com/greglook/blocks-s3"
   :license {:name "Public Domain"
@@ -11,20 +11,20 @@
   :pedantic? :abort
 
   :dependencies
-  [[org.clojure/clojure "1.10.0"]
-   [org.clojure/tools.logging "0.4.1"]
-   [mvxcvi/blocks "2.0.1"]
-   ; TODO: upgrade to software.amazon.awssdk/s3 v2
-   [com.amazonaws/aws-java-sdk-s3 "1.11.491"]]
+  [[org.clojure/clojure "1.10.1"]
+   [org.clojure/tools.logging "1.0.0"]
+   [mvxcvi/blocks "2.0.4"]
+   ;; TODO: investigate alternate SDK options:
+   ;; [software.amazon.awssdk/s3 "..."]
+   ;; https://github.com/cognitect-labs/aws-api
+   [com.amazonaws/aws-java-sdk-s3 "1.11.769"]]
+
+  :managed-dependencies
+  [[commons-logging "1.2"]]
 
   :test-selectors
   {:default (complement :integration)
    :integration :integration}
-
-  :codox
-  {:metadata {:doc/format :markdown}
-   :source-uri "https://github.com/greglook/blocks-s3/blob/master/{filepath}#L{line}"
-   :output-path "target/doc/api"}
 
   :whidbey
   {:tag-types {'multiformats.hash.Multihash {'multi/hash 'multiformats.hash/hex}
@@ -36,19 +36,19 @@
   :profiles
   {:dev
    {:dependencies
-    [[mvxcvi/blocks-tests "2.0.1"]
-     [commons-logging "1.2"]]}
+    [[mvxcvi/blocks-tests "2.0.4"]
+     [org.slf4j/slf4j-simple "1.7.30"]]}
 
    :repl
    {:source-paths ["dev"]
     :dependencies
-    [[org.clojure/tools.namespace "0.2.11"]]}
+    [[org.clojure/tools.namespace "1.0.0"]]
+    :jvm-opts ["-Dorg.slf4j.simpleLogger.defaultLogLevel=info"]}
 
    :test
-   {:jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.NoOpLog"]}
+   {:jvm-opts ["-Dorg.slf4j.simpleLogger.defaultLogLevel=fatal"]}
 
    :coverage
    {:pedantic? false
-    :plugins [[lein-cloverage "1.1.1"]]
-    :jvm-opts ["-Dorg.apache.commons.logging.Log=org.apache.commons.logging.impl.SimpleLog"
-               "-Dorg.apache.commons.logging.simplelog.defaultlog=trace"]}})
+    :plugins [[lein-cloverage "1.1.2"]]
+    :jvm-opts ["-Dorg.slf4j.simpleLogger.defaultLogLevel=debug"]}})
